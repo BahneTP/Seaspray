@@ -1,14 +1,12 @@
 """
-Synthetic dataset generation (Thesis-style)
+Synthetic dataset generation
 
-Implements the synthetic-data setup described in the thesis:
 - Define reference clusters
 - For each cluster and each feature:
     mu  = mean(real_data)
     sigma ≈ (max - min) / 4   (range/4 heuristic)
 - Sample synthetic points from independent Gaussian distributions:
     x ~ N(mu, sigma^2) per feature
-- Reproducible via fixed random seed
 """
 
 import numpy as np
@@ -18,47 +16,36 @@ import pandas as pd
 # CONFIG
 # -------------------------------------------------
 INPUT_XLSX = "../data/terrherbmarin.xlsx"
-SHEET_NAME = 0               # or e.g. "Sheet1"
-NROWS = 88                 # e.g. 88, or None for all
+SHEET_NAME = 0
+NROWS = 88                 # 88, since the last rows are only notes.
 SEED = 0
 FEATURES = ["δ13C coll", "δ15N coll", "δ13C carb", "δ18O carb"]
 SIZE = 300                 
 
-# Output files
-OUT_CSV = "synthetic_dataset.csv"
-OUT_XLSX = "synthetic_dataset.xlsx"
-
+# Separation parameters
+SHRINK_SIGMA = 1#0.6
+SHIFT_MEAN = 0#2.0
 
 # -------------------------------------------------
 # 1) Load data
 # -------------------------------------------------
 df = pd.read_excel(INPUT_XLSX, engine="openpyxl", sheet_name=SHEET_NAME, nrows=NROWS)
 
-# Normalize strings (safe even if NaN)
+# Normalize strings
 if "diet" in df.columns:
     df["diet"] = df["diet"].astype(str).str.lower().str.strip()
-
-
-# -------------------------------------------------
-# 2) ONE-HOT Encoding
-# -------------------------------------------------
-# (kept as-is; now uses diet categories inferred from FEATURES' names is not intended,
-# so we skip one-hot creation if FEATURES are isotopes)
-# If you still want one-hot diet columns in addition to isotopes, define DIET_FEATURES separately.
-pass
-
 
 # -------------------------------------------------
 # 3) Define reference clusters
 # -------------------------------------------------
-# Use diet as clusters (same as your original logic), but do NOT filter by FEATURES anymore
-# because FEATURES are isotope column names now.
 df["cluster"] = df["diet"]
 df = df.dropna(subset=["cluster"]).copy()
 
 # Ensure isotope features exist and are not NaN
 df = df.dropna(subset=FEATURES).copy()
 
+# Keep only herbivorous and piscivorous
+df = df[df["diet"].isin(["herbivorous", "piscivorous"])].copy()
 
 # -------------------------------------------------
 # 4) Compute params: mu and sigma≈range/4 per cluster & feature
@@ -76,7 +63,6 @@ for cluster_name, sub in df.groupby("cluster"):
         r = float(sub[f].max() - sub[f].min())
         sigma = r / 4.0
 
-        # Avoid sigma=0 (would make feature constant in synthetic data)
         if sigma == 0.0:
             sigma = 1e-6
 
@@ -100,6 +86,33 @@ params_table = pd.DataFrame(params_rows)
 
 
 # -------------------------------------------------
+# Separation adjustment (mean shift + sigma shrink)
+# -------------------------------------------------
+cluster_names = list(params.keys())
+print(cluster_names)
+
+if len(cluster_names) == 2:
+    c1, c2 = cluster_names
+
+    for i in range(len(FEATURES)):
+        mu1 = params[c1]["mu"][i]
+        mu2 = params[c2]["mu"][i]
+        s1 = params[c1]["sigma"][i]
+        s2 = params[c2]["sigma"][i]
+
+        s1_new = s1 * SHRINK_SIGMA
+        s2_new = s2 * SHRINK_SIGMA
+
+        mu1_new = mu1 - SHIFT_MEAN * s1_new
+        mu2_new = mu2 + SHIFT_MEAN * s2_new
+
+        params[c1]["mu"][i] = mu1_new
+        params[c2]["mu"][i] = mu2_new
+        params[c1]["sigma"][i] = s1_new
+        params[c2]["sigma"][i] = s2_new
+
+
+# -------------------------------------------------
 # 5) Generate synthetic samples (Gaussian per feature)
 # -------------------------------------------------
 rng = np.random.default_rng(SEED)
@@ -112,21 +125,7 @@ for cluster_name, p in params.items():
     synthetic_parts.append(syn)
 
 synthetic_df = pd.concat(synthetic_parts, ignore_index=True)
-
-
-# -------------------------------------------------
-# 6) Save outputs
-# -------------------------------------------------
-synthetic_df.to_csv(OUT_CSV, index=False)
-
-with pd.ExcelWriter(OUT_XLSX, engine="openpyxl") as writer:
-    synthetic_df.to_excel(writer, index=False, sheet_name="synthetic")
-    params_table.to_excel(writer, index=False, sheet_name="params_mu_sigma")
-    # quick real summary
-    real_summary = df.groupby("cluster")[FEATURES].agg(["mean", "min", "max", "std", "count"])
-    real_summary.to_excel(writer, sheet_name="real_summary")
+synthetic_df.to_csv("../data/synthetic_dataset.csv", index=False)
 
 print("Done.")
-print("Clusters:", df["cluster"].value_counts().to_dict())
-print("Saved:", OUT_CSV, "and", OUT_XLSX)
 print(synthetic_df.head())
