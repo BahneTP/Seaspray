@@ -4,3 +4,4 @@ xlrd
 matplotlib
 Pillow
 scipy
+sklearn
