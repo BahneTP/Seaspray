@@ -23,9 +23,24 @@ SEED = 0
 FEATURES = ["δ13C coll", "δ15N coll", "δ13C carb", "δ18O carb"]
 SIZE = 200
 
-# Separation parameters
-SHRINK_SIGMA = 1#0.6
-SHIFT_MEAN = 0#2.0
+# -------------------------------------------------
+# Manual adjustment of mean and std per cluster & feature
+# Factors multiply existing sigma, shifts are added to mean
+# -------------------------------------------------
+MANUAL_ADJUSTMENTS = {
+    "herbivorous": {
+        "δ13C coll": {"mean_shift": 0.0, "sigma_factor": 0.8},
+        "δ15N coll": {"mean_shift": -1.0, "sigma_factor": 0.8},
+        "δ13C carb": {"mean_shift": -3.0, "sigma_factor": 0.6},
+        "δ18O carb": {"mean_shift": -4.0, "sigma_factor": 0.6},
+    },
+    "piscivorous": {
+        "δ13C coll": {"mean_shift": 0.0, "sigma_factor": 0.8},
+        "δ15N coll": {"mean_shift": 1.0, "sigma_factor": 0.8},
+        "δ13C carb": {"mean_shift": 3.0, "sigma_factor": 0.6},
+        "δ18O carb": {"mean_shift": 4.0, "sigma_factor": 0.6},
+    }
+}
 
 # IBI parameters
 IBI_SIZE = 20
@@ -43,7 +58,6 @@ if "diet" in df.columns:
 # -------------------------------------------------
 # 2) Preprocessing
 # -------------------------------------------------
-
 df["diet"] = df["diet"].astype(str).str.lower().str.strip()
 df["species"] = df["species"].astype(str).str.lower().str.strip()
 
@@ -98,32 +112,66 @@ for cluster_name, sub in df.groupby("cluster"):
 
 params_table = pd.DataFrame(params_rows)
 
+# -------------------------------------------------
+# Save original parameters for later comparison
+# -------------------------------------------------
+original_params = {}
+
+for cluster_name, p in params.items():
+    original_params[cluster_name] = {
+        "mu": p["mu"].copy(),
+        "sigma": p["sigma"].copy()
+    }
 
 # -------------------------------------------------
-# 4) Separation adjustment (mean shift + sigma shrink)
+# 4) Manual adjustment of means and sigmas
 # -------------------------------------------------
 cluster_names = list(params.keys())
 print(cluster_names)
 
-c1, c2 = cluster_names
+for cluster_name in cluster_names:
+    if cluster_name not in MANUAL_ADJUSTMENTS:
+        continue
 
-for i in range(len(FEATURES)):
-    mu1 = params[c1]["mu"][i]
-    mu2 = params[c2]["mu"][i]
-    s1 = params[c1]["sigma"][i]
-    s2 = params[c2]["sigma"][i]
+    for i, feature in enumerate(FEATURES):
+        adj = MANUAL_ADJUSTMENTS[cluster_name].get(
+            feature,
+            {"mean_shift": 0.0, "sigma_factor": 1.0}
+        )
 
-    s1_new = s1 * SHRINK_SIGMA
-    s2_new = s2 * SHRINK_SIGMA
+        mean_shift = float(adj.get("mean_shift", 0.0))
+        sigma_factor = float(adj.get("sigma_factor", 1.0))
 
-    mu1_new = mu1 - SHIFT_MEAN * s1_new
-    mu2_new = mu2 + SHIFT_MEAN * s2_new
+        params[cluster_name]["mu"][i] += mean_shift
+        params[cluster_name]["sigma"][i] *= sigma_factor
 
-    params[c1]["mu"][i] = mu1_new
-    params[c2]["mu"][i] = mu2_new
-    params[c1]["sigma"][i] = s1_new
-    params[c2]["sigma"][i] = s2_new
+        if params[cluster_name]["sigma"][i] <= 0.0:
+            params[cluster_name]["sigma"][i] = 1e-6
 
+# -------------------------------------------------
+# Print comparison table: original vs changed
+# -------------------------------------------------
+comparison_rows = []
+
+for cluster_name in params.keys():
+    for i, f in enumerate(FEATURES):
+        comparison_rows.append({
+            "cluster": cluster_name,
+            "feature": f,
+            "mean": original_params[cluster_name]["mu"][i],
+            "std": original_params[cluster_name]["sigma"][i],
+            "mean_changed": params[cluster_name]["mu"][i],
+            "std_changed": params[cluster_name]["sigma"][i],
+        })
+
+comparison_table = pd.DataFrame(comparison_rows)
+
+print("\nMean/Std comparison per cluster and feature:\n")
+print(
+    comparison_table
+    .pivot(index="feature", columns="cluster", values=["mean", "std", "mean_changed", "std_changed"])
+    .round(3)
+)
 
 # -------------------------------------------------
 # 5) Generate synthetic samples (Gaussian per feature)
@@ -158,5 +206,3 @@ synthetic_df = pd.concat(synthetic_parts, ignore_index=True)
 synthetic_df.to_csv("../data/synthetic_dataset.csv", index=False)
 
 print("Done.")
-print(synthetic_df["cluster"].value_counts())
-print(synthetic_df.head())
