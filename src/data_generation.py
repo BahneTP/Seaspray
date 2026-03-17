@@ -25,7 +25,7 @@ SIZE = 200
 
 # -------------------------------------------------
 # Manual adjustment of mean and std per cluster & feature
-# Factors multiply existing sigma, shifts are added to mean
+# Factors multiply existing sigma, shifts are added to meanA
 # -------------------------------------------------
 MANUAL_ADJUSTMENTS = {
     "herbivorous": {
@@ -44,7 +44,7 @@ MANUAL_ADJUSTMENTS = {
 
 # IBI parameters
 IBI_SIZE = 20
-IBI_STD_FACTOR = 1.25
+IBI_STD_FACTOR = 1.0
 
 # -------------------------------------------------
 # 1) Load data
@@ -188,14 +188,20 @@ for cluster_name, p in params.items():
 c1, c2 = cluster_names
 
 ibi_center = 0.5 * (params[c1]["mu"] + params[c2]["mu"])
-ibi_std = float(np.mean(0.5 * (params[c1]["sigma"] + params[c2]["sigma"])) * IBI_STD_FACTOR)
+ibi_sigma = 0.5 * (params[c1]["sigma"] + params[c2]["sigma"]) * IBI_STD_FACTOR
 
-ibi_X, _ = make_blobs(
-    n_samples=IBI_SIZE,
-    centers=[ibi_center],
-    cluster_std=ibi_std,
-    n_features=len(FEATURES),
-    random_state=SEED
+# Since we want the IBI's d13C and d15N values to be equivalent to the herbivorous ones,
+# we just set overwrite the named 2 dimensions. 
+ibi_center[FEATURES.index("δ13C coll")] = params["herbivorous"]["mu"][FEATURES.index("δ13C coll")]
+ibi_center[FEATURES.index("δ15N coll")] = params["herbivorous"]["mu"][FEATURES.index("δ15N coll")]
+
+ibi_sigma[FEATURES.index("δ13C coll")] = params["herbivorous"]["sigma"][FEATURES.index("δ13C coll")]
+ibi_sigma[FEATURES.index("δ15N coll")] = params["herbivorous"]["sigma"][FEATURES.index("δ15N coll")]
+
+ibi_X = rng.normal(
+    loc=ibi_center,
+    scale=ibi_sigma,
+    size=(IBI_SIZE, len(FEATURES))
 )
 
 ibi_df = pd.DataFrame(ibi_X, columns=FEATURES)
