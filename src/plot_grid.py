@@ -4,206 +4,209 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# -------------------------------------------
-# CONFIG
-# -------------------------------------------
-synthetic_df = pd.read_csv("../data/synthetic_dataset.csv")
 
-FEATURES = ["δ13C coll", "δ15N coll", "δ13C carb", "δ18O carb"]
+def run(config):
+    c = config.Config
+    # -------------------------------------------
+    # CONFIG
+    # -------------------------------------------
+    synthetic_df = pd.read_csv(f"../output/synthetic_datasets/{c.NAME}.csv")
 
-FEATURE_LABELS = {
-    "δ13C coll": r"$\delta^{13}C_{\mathrm{collagen}}$" + "\n[‰ VPDB]",
-    "δ15N coll": r"$\delta^{15}N_{\mathrm{collagen}}$" + "\n[‰ AIR]",
-    "δ13C carb": r"$\delta^{13}C_{\mathrm{carbonate}}$" + "\n[‰ VPDB]",
-    "δ18O carb": r"$\delta^{18}O_{\mathrm{carbonate}}$" + "\n[‰ VPDB]",
-}
+    FEATURES = ["δ13C coll", "δ15N coll", "δ13C carb", "δ18O carb"]
 
-colors = {
-    "herbivorous": "green",
-    "piscivorous": "blue",
-    "ibi": "orange"
-}
+    FEATURE_LABELS = {
+        "δ13C coll": r"$\delta^{13}C_{\mathrm{collagen}}$" + "\n[‰ VPDB]",
+        "δ15N coll": r"$\delta^{15}N_{\mathrm{collagen}}$" + "\n[‰ AIR]",
+        "δ13C carb": r"$\delta^{13}C_{\mathrm{carbonate}}$" + "\n[‰ VPDB]",
+        "δ18O carb": r"$\delta^{18}O_{\mathrm{carbonate}}$" + "\n[‰ VPDB]",
+    }
 
-lower_limit_color = "black"
+    colors = {
+        "herbivorous": "green",
+        "piscivorous": "blue",
+        "ibi": "orange"
+    }
 
-# -------------------------------------------
-# Data
-# -------------------------------------------
-pisc = synthetic_df[synthetic_df["cluster"] == "piscivorous"]
+    lower_limit_color = "black"
 
-n_features = len(FEATURES)
+    # -------------------------------------------
+    # Data
+    # -------------------------------------------
+    pisc = synthetic_df[synthetic_df["cluster"] == "piscivorous"]
 
-fig, axes = plt.subplots(
-    n_features,
-    n_features,
-    figsize=(12, 12),
-    squeeze=False
-)
+    n_features = len(FEATURES)
 
-# -------------------------------------------
-# consistent axis limits
-# -------------------------------------------
-feature_limits = {}
-
-for feature in FEATURES:
-
-    vmin = synthetic_df[feature].min()
-    vmax = synthetic_df[feature].max()
-
-    padding = (vmax - vmin) * 0.05
-
-    feature_limits[feature] = (
-        vmin - padding,
-        vmax + padding
+    fig, axes = plt.subplots(
+        n_features,
+        n_features,
+        figsize=(12, 12),
+        squeeze=False
     )
 
-# -------------------------------------------
-# Plot matrix
-# -------------------------------------------
-for row, y_feature in enumerate(FEATURES):
+    # -------------------------------------------
+    # consistent axis limits
+    # -------------------------------------------
+    feature_limits = {}
 
-    for col, x_feature in enumerate(FEATURES):
+    for feature in FEATURES:
 
-        ax = axes[row, col]
+        vmin = synthetic_df[feature].min()
+        vmax = synthetic_df[feature].max()
 
-        ax.set_xlim(feature_limits[x_feature])
-        ax.set_ylim(feature_limits[y_feature])
+        padding = (vmax - vmin) * 0.05
 
-        # -------------------------------------------
-        # Diagonal
-        # -------------------------------------------
-        if row == col:
-
-            ax.text(
-                0.5,
-                0.5,
-                FEATURE_LABELS[x_feature],
-                ha="center",
-                va="center",
-                fontsize=11,
-                transform=ax.transAxes
-            )
-
-            ax.set_xticks([])
-            ax.set_yticks([])
-
-            continue
-
-        # -------------------------------------------
-        # Scatter points
-        # -------------------------------------------
-        for cluster, color in colors.items():
-
-            subset = synthetic_df[synthetic_df["cluster"] == cluster]
-
-            ax.scatter(
-                subset[x_feature],
-                subset[y_feature],
-                color=color,
-                s=20,
-                alpha=0.85
-            )
-
-        # -------------------------------------------
-        # Lower Marine Limit
-        # -------------------------------------------
-        lower_limit_x = pisc[x_feature].min()
-        lower_limit_y = pisc[y_feature].min()
-
-        ax.axvline(
-            x=lower_limit_x,
-            color=lower_limit_color,
-            linestyle="--",
-            linewidth=1.5
+        feature_limits[feature] = (
+            vmin - padding,
+            vmax + padding
         )
 
-        ax.axhline(
-            y=lower_limit_y,
-            color=lower_limit_color,
-            linestyle="--",
-            linewidth=1.5
-        )
+    # -------------------------------------------
+    # Plot matrix
+    # -------------------------------------------
+    for row, y_feature in enumerate(FEATURES):
 
-        # -------------------------------------------
-        # TICKS ONLY OUTSIDE
-        # -------------------------------------------
-        ax.tick_params(
-            axis='both',
-            which='both',
-            bottom=False,
-            top=False,
-            left=False,
-            right=False,
-            labelbottom=False,
-            labeltop=False,
-            labelleft=False,
-            labelright=False
-        )
+        for col, x_feature in enumerate(FEATURES):
 
-        # bottom ticks
-        if row == n_features - 1:
+            ax = axes[row, col]
 
-            ax.tick_params(
-                bottom=True,
-                labelbottom=True
+            ax.set_xlim(feature_limits[x_feature])
+            ax.set_ylim(feature_limits[y_feature])
+
+            # -------------------------------------------
+            # Diagonal
+            # -------------------------------------------
+            if row == col:
+
+                ax.text(
+                    0.5,
+                    0.5,
+                    FEATURE_LABELS[x_feature],
+                    ha="center",
+                    va="center",
+                    fontsize=11,
+                    transform=ax.transAxes
+                )
+
+                ax.set_xticks([])
+                ax.set_yticks([])
+
+                continue
+
+            # -------------------------------------------
+            # Scatter points
+            # -------------------------------------------
+            for cluster, color in colors.items():
+
+                subset = synthetic_df[synthetic_df["cluster"] == cluster]
+
+                ax.scatter(
+                    subset[x_feature],
+                    subset[y_feature],
+                    color=color,
+                    s=20,
+                    alpha=0.85
+                )
+
+            # -------------------------------------------
+            # Lower Marine Limit
+            # -------------------------------------------
+            lower_limit_x = pisc[x_feature].min()
+            lower_limit_y = pisc[y_feature].min()
+
+            ax.axvline(
+                x=lower_limit_x,
+                color=lower_limit_color,
+                linestyle="--",
+                linewidth=1.5
             )
 
-        # top ticks
-        if row == 0:
-
-            ax.tick_params(
-                top=True,
-                labeltop=True
+            ax.axhline(
+                y=lower_limit_y,
+                color=lower_limit_color,
+                linestyle="--",
+                linewidth=1.5
             )
 
-        # left ticks
-        if col == 0:
-
+            # -------------------------------------------
+            # TICKS ONLY OUTSIDE
+            # -------------------------------------------
             ax.tick_params(
-                left=True,
-                labelleft=True
+                axis='both',
+                which='both',
+                bottom=False,
+                top=False,
+                left=False,
+                right=False,
+                labelbottom=False,
+                labeltop=False,
+                labelleft=False,
+                labelright=False
             )
 
-        # right ticks
-        if col == n_features - 1:
+            # bottom ticks
+            if row == n_features - 1:
 
-            ax.tick_params(
-                right=True,
-                labelright=True
-            )
+                ax.tick_params(
+                    bottom=True,
+                    labelbottom=True
+                )
 
-        # -------------------------------------------
-        # Labels
-        # -------------------------------------------
-        if row == n_features - 1:
+            # top ticks
+            if row == 0:
 
-            ax.set_xlabel(FEATURE_LABELS[x_feature], fontsize=10)
+                ax.tick_params(
+                    top=True,
+                    labeltop=True
+                )
 
-        if row == 0:
+            # left ticks
+            if col == 0:
 
-            ax.xaxis.set_label_position("top")
-            ax.set_xlabel(FEATURE_LABELS[x_feature], fontsize=10)
+                ax.tick_params(
+                    left=True,
+                    labelleft=True
+                )
 
-        if col == 0:
+            # right ticks
+            if col == n_features - 1:
 
-            ax.set_ylabel(FEATURE_LABELS[y_feature], fontsize=10)
+                ax.tick_params(
+                    right=True,
+                    labelright=True
+                )
 
-        if col == n_features - 1:
+            # -------------------------------------------
+            # Labels
+            # -------------------------------------------
+            if row == n_features - 1:
 
-            ax.yaxis.set_label_position("right")
-            ax.set_ylabel(FEATURE_LABELS[y_feature], fontsize=10)
+                ax.set_xlabel(FEATURE_LABELS[x_feature], fontsize=10)
 
-# -------------------------------------------
-# Layout
-# -------------------------------------------
-plt.subplots_adjust(
-    wspace=0.02,
-    hspace=0.02
-)
+            if row == 0:
 
-plt.savefig(
-    "../output/synthetic_plot_matrix.png",
-    dpi=300
-)
+                ax.xaxis.set_label_position("top")
+                ax.set_xlabel(FEATURE_LABELS[x_feature], fontsize=10)
 
-print("Plot saved.")
+            if col == 0:
+
+                ax.set_ylabel(FEATURE_LABELS[y_feature], fontsize=10)
+
+            if col == n_features - 1:
+
+                ax.yaxis.set_label_position("right")
+                ax.set_ylabel(FEATURE_LABELS[y_feature], fontsize=10)
+
+    # -------------------------------------------
+    # Layout
+    # -------------------------------------------
+    plt.subplots_adjust(
+        wspace=0.02,
+        hspace=0.02
+    )
+
+    plt.savefig(
+        f"../output/plots/{c.NAME}_synthetic_plot_matrix.png",
+        dpi=300
+    )
+
+    print("Plot saved.")
