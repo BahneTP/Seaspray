@@ -164,7 +164,7 @@ def run(config):
     synthetic_parts.append(ibi_df)
 
     synthetic_df = pd.concat(synthetic_parts, ignore_index=True)
-    synthetic_df.to_csv(f"../output/synthetic_datasets/{c.NAME}.csv", index=False)
+    synthetic_df.to_csv(f"../../output/synthetic_datasets/{c.NAME}.csv", index=False)
 
 
     # -------------------------------------------------

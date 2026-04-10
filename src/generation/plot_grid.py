@@ -10,7 +10,7 @@ def run(config):
     # -------------------------------------------
     # CONFIG
     # -------------------------------------------
-    synthetic_df = pd.read_csv(f"../output/synthetic_datasets/{c.NAME}.csv")
+    synthetic_df = pd.read_csv(f"../../output/synthetic_datasets/{c.NAME}.csv")
 
     FEATURES = ["δ13C coll", "δ15N coll", "δ13C carb", "δ18O carb"]
 
