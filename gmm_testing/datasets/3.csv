@@ -1,0 +1,12 @@
+x1,x2,cluster,point_type
+-2.0,-0.35,A,cluster
+-2.0,0.35,A,cluster
+2.0,-0.35,B,cluster
+2.0,0.35,B,cluster
+0.0,0.0,middle,middle
+0.0,-0.2,middle,middle
+0.0,0.2,middle,middle
+-0.1,0.0,middle,middle
+0.1,0.0,middle,middle
+-1,0.0,middle,middle
+1,0.0,middle,middle

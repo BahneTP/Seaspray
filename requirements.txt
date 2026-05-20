@@ -5,3 +5,4 @@ matplotlib
 Pillow
 scipy
 sklearn
+rpy2
