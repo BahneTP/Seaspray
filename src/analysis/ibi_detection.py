@@ -23,22 +23,63 @@ def calculate_ibi_metrics(df):
     }
 
 
-def detect_ibi(df, margin_threshold=1.0, printing=True):
+def _get_ibi_mask(df, mode, svm_threshold, gmm_threshold, combined_operator):
+    mode = mode.lower()
+    combined_operator = combined_operator.lower()
+
+    if mode not in ["svm", "gmm", "combined"]:
+        raise ValueError("mode must be one of: 'svm', 'gmm', 'combined'")
+
+    if combined_operator not in ["or", "and"]:
+        raise ValueError("combined_operator must be either 'or' or 'and'")
+
+    if mode == "svm":
+        return df["svm_margin_distance"] <= svm_threshold
+
+    if mode == "gmm":
+        return df["gmm_prob_distance"] <= gmm_threshold
+
+    svm_detected = df["svm_margin_distance"] <= svm_threshold
+    gmm_detected = df["gmm_prob_distance"] <= gmm_threshold
+
+    if combined_operator == "and":
+        return svm_detected & gmm_detected
+
+    return svm_detected | gmm_detected
+
+
+def detect_ibi(
+    df,
+    mode="svm",
+    svm_threshold=1.0,
+    gmm_threshold=0.2,
+    combined_operator="or",
+    printing=True
+):
     df_results = df.copy()
 
-    df_results["svm_margin_distance"] = df_results["svm_margin"].abs()
-    df_results["ibi_detected"] = df_results["svm_margin_distance"] <= margin_threshold
+    df_results["ibi_detected"] = _get_ibi_mask(
+        df_results,
+        mode=mode,
+        svm_threshold=svm_threshold,
+        gmm_threshold=gmm_threshold,
+        combined_operator=combined_operator
+    )
     df_results["ibi_pred"] = np.where(
         df_results["ibi_detected"],
         "ibi",
-        df_results["svm_pred"]
+        df_results.get("svm_pred", "not_ibi")
     )
 
     metrics = calculate_ibi_metrics(df_results)
 
     if printing:
         print("\n==================== IBI DETECTION: ====================")
-        print("Margin threshold:", margin_threshold)
+        print("Mode:", mode)
+        print("SVM threshold:", svm_threshold)
+        print("GMM threshold:", gmm_threshold)
+        if mode == "combined":
+            print("Combined operator:", combined_operator)
         print("Detected IBI entries:", metrics["detected_ibi"])
 
         print("True IBI entries:", metrics["true_ibi"])
@@ -56,18 +97,50 @@ def detect_ibi(df, margin_threshold=1.0, printing=True):
 
 def plot_ibi_threshold_metrics(
     df,
+    mode="svm",
     start_threshold=0.1,
     end_threshold=1.5,
     step_size=0.1,
-    output_path="ibi_threshold_metrics.png"
+    output_path="ibi_threshold_metrics.png",
+    fixed_svm_threshold=1.0,
+    fixed_gmm_threshold=0.2,
+    combined_operator="or",
+    sweep_threshold="auto"
 ):
     rows = []
     thresholds = np.arange(start_threshold, end_threshold + step_size / 2, step_size)
+    mode = mode.lower()
+
+    if sweep_threshold == "auto":
+        sweep_threshold = "svm" if mode == "combined" else mode
+    else:
+        sweep_threshold = sweep_threshold.lower()
+
+    if sweep_threshold not in ["svm", "gmm", "both"]:
+        raise ValueError("sweep_threshold must be one of: 'auto', 'svm', 'gmm', 'both'")
 
     for threshold in thresholds:
-        df_threshold = detect_ibi(df, margin_threshold=threshold, printing=False)
+        svm_threshold = fixed_svm_threshold
+        gmm_threshold = fixed_gmm_threshold
+
+        if sweep_threshold in ["svm", "both"]:
+            svm_threshold = threshold
+
+        if sweep_threshold in ["gmm", "both"]:
+            gmm_threshold = threshold
+
+        df_threshold = detect_ibi(
+            df,
+            mode=mode,
+            svm_threshold=svm_threshold,
+            gmm_threshold=gmm_threshold,
+            combined_operator=combined_operator,
+            printing=False
+        )
         metrics = calculate_ibi_metrics(df_threshold)
         metrics["threshold"] = threshold
+        metrics["svm_threshold"] = svm_threshold
+        metrics["gmm_threshold"] = gmm_threshold
         rows.append(metrics)
 
     metrics_df = pd.DataFrame(rows)
@@ -77,9 +150,9 @@ def plot_ibi_threshold_metrics(
     plt.plot(metrics_df["threshold"], metrics_df["precision"], marker="o", label="Precision")
     plt.plot(metrics_df["threshold"], metrics_df["recall"], marker="o", label="Recall")
     plt.plot(metrics_df["threshold"], metrics_df["f1_score"], marker="o", label="F1-score")
-    plt.xlabel("SVM margin threshold")
+    plt.xlabel(f"{sweep_threshold.upper()} threshold")
     plt.ylabel("Metric value")
-    plt.title("IBI detection metrics by threshold")
+    plt.title(f"IBI detection metrics by threshold ({mode})")
     plt.ylim(0, 1.05)
     plt.grid(True, alpha=0.3)
     plt.legend()
@@ -91,6 +164,8 @@ def plot_ibi_threshold_metrics(
 
     best_row = metrics_df.loc[metrics_df["f1_score"].idxmax()]
     print("\n==================== IBI THRESHOLD SEARCH: ====================")
+    print("Mode:", mode)
+    print("Swept threshold:", sweep_threshold)
     print("Start threshold:", start_threshold)
     print("End threshold:", end_threshold)
     print("Step size:", step_size)

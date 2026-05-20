@@ -34,4 +34,5 @@ class GMM():
         probs = self.gmm.predict_proba(X_all_scaled)  # shape: (n_samples, 2)
         df["gmm_prob_0"] = probs[:, 0]
         df["gmm_prob_1"] = probs[:, 1]
+        df["gmm_prob_distance"] = np.abs(probs[:, 0] - probs[:, 1])
         return df

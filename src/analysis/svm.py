@@ -48,6 +48,6 @@ class SVM():
 
         df_all_results = df.copy()
         df_all_results["svm_pred"] = self.svm_model.predict(X_all)
-        df_all_results["svm_margin"] = self.svm_model.decision_function(X_all)
+        df_all_results["svm_margin_distance"] = np.abs(self.svm_model.decision_function(X_all))
 
         return df_all_results
