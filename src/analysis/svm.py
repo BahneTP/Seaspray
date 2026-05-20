@@ -3,7 +3,6 @@ import numpy as np
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
 import matplotlib
@@ -12,20 +11,13 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
 class SVM():
-    def __init__(self, df, feature_cols):
-        # ===== Splitting the data. =====
-        df_train = df[df["cluster"].isin(["herbivorous", "piscivorous"])].copy()
+    def __init__(self, df_train, df_test, feature_cols):
         self.feature_cols = feature_cols
 
-        X = df_train[feature_cols]
-        y = df_train["cluster"]
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X,
-            y,
-            test_size=0.2,
-            random_state=42,
-            stratify=y
-        )
+        self.X_train = df_train[feature_cols]
+        self.y_train = df_train["cluster"]
+        self.X_test = df_test[feature_cols]
+        self.y_test = df_test["cluster"]
 
         # ===== SVM Pipeline =====
         # Standardizing.

@@ -5,14 +5,11 @@ from sklearn.preprocessing import StandardScaler
 # np.set_printoptions(suppress=True)
 
 class GMM():
-    def __init__(self, df, feature_cols):
+    def __init__(self, df_train, feature_cols):
 
         self.feature_cols = feature_cols
-        self.df = df
 
         # ===== Preprocessing. =====
-        # Get relevant values. (No Ibis.)
-        df_train = df[df["cluster"].isin(["herbivorous", "piscivorous"])].copy()
         X_train = df_train[feature_cols].values
 
         # Standardizing.
