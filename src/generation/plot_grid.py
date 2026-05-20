@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def run(config):
@@ -10,7 +13,7 @@ def run(config):
     # -------------------------------------------
     # CONFIG
     # -------------------------------------------
-    synthetic_df = pd.read_csv(f"../../output/synthetic_datasets/{c.NAME}.csv")
+    synthetic_df = pd.read_csv(PROJECT_ROOT / "output" / "synthetic_datasets" / f"{c.NAME}.csv")
 
     FEATURES = ["δ13C coll", "δ15N coll", "δ13C carb", "δ18O carb"]
 
@@ -204,8 +207,10 @@ def run(config):
         hspace=0.02
     )
 
+    output_dir = PROJECT_ROOT / "output" / "synthetic_datasets"
+    output_dir.mkdir(parents=True, exist_ok=True)
     plt.savefig(
-        f"../output/plots/{c.NAME}_synthetic_plot_matrix.png",
+        output_dir / f"{c.NAME}_synthetic_plot_matrix.png",
         dpi=300
     )
 

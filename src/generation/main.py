@@ -10,7 +10,7 @@ def main():
         "--config",
         type=str,
         required=True,
-        help="Name der Config, z. B. config_0 oder overlap_high"
+        help="Name der Config, z. B. config_0"
     )
     args = parser.parse_args()
 

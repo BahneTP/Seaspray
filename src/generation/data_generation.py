@@ -1,9 +1,13 @@
 import numpy as np
 import pandas as pd
 from sklearn.datasets import make_blobs
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = PROJECT_ROOT / "src"
 
 def run(config):
     c = config.Config
@@ -12,7 +16,11 @@ def run(config):
     # -------------------------------------------------
     # 1) Load data
     # -------------------------------------------------
-    df = pd.read_excel(c.INPUT_XLSX, engine="openpyxl", sheet_name=c.SHEET_NAME, nrows=c.NROWS)
+    input_xlsx = Path(c.INPUT_XLSX)
+    if not input_xlsx.is_absolute():
+        input_xlsx = SRC_ROOT / input_xlsx
+
+    df = pd.read_excel(input_xlsx, engine="openpyxl", sheet_name=c.SHEET_NAME, nrows=c.NROWS)
 
     # Normalize strings
     if "diet" in df.columns:
@@ -164,7 +172,9 @@ def run(config):
     synthetic_parts.append(ibi_df)
 
     synthetic_df = pd.concat(synthetic_parts, ignore_index=True)
-    synthetic_df.to_csv(f"../../output/synthetic_datasets/{c.NAME}.csv", index=False)
+    output_dir = PROJECT_ROOT / "output" / "synthetic_datasets"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    synthetic_df.to_csv(output_dir / f"{c.NAME}.csv", index=False)
 
 
     # -------------------------------------------------
