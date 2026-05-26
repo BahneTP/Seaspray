@@ -25,7 +25,7 @@ def component_for_cluster_a(gmm, x_train_scaled, labels):
 
 def run(dataset_path, output_path):
     df = pd.read_csv(dataset_path)
-    train_df = df[df["cluster"].isin(["A", "B"])].copy()
+    train_df = df[df["cluster"].isin(["A", "B", "middle"])].copy() #["A", "B"]
 
     x_train = train_df[FEATURES].to_numpy(dtype=float)
     x_all = df[FEATURES].to_numpy(dtype=float)

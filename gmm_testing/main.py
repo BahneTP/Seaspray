@@ -36,6 +36,10 @@ def run_command(command, env=None):
         universal_newlines=True,
         env=env,
     )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
     if result.returncode != 0:
         raise RuntimeError(
             "Command failed:\n{}\n\nSTDOUT:\n{}\n\nSTDERR:\n{}".format(
@@ -44,6 +48,7 @@ def run_command(command, env=None):
                 result.stderr,
             )
         )
+    return result
 
 
 def run_sklearn(dataset_path, output_path):

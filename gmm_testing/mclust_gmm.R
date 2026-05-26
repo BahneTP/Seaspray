@@ -13,6 +13,7 @@ features <- c("x1", "x2")
 
 df <- read.csv(dataset_path)
 train_df <- df[df$cluster %in% c("A", "B"), ]
+#train_df <- df[df$cluster %in% c("A", "B", "middle"), ]
 
 X_train <- as.matrix(train_df[, features])
 X_all <- as.matrix(df[, features])
@@ -25,7 +26,7 @@ X_all_scaled <- scale(X_all, center = center, scale = scale_)
 gmm <- Mclust(
   X_train_scaled,
   G = 2,
-  modelNames = "VVV",
+  #modelNames = "VVV",
   verbose = FALSE
 )
 if (is.null(gmm)) {
@@ -38,6 +39,8 @@ if (is.null(gmm)) {
 if (is.null(gmm)) {
   stop("mclust could not estimate a GMM for this dataset", call. = FALSE)
 }
+
+cat("Selected mclust modelName:", gmm$modelName, "\n")
 
 train_pred <- predict(gmm, newdata = X_train_scaled)
 a_means <- colMeans(train_pred$z[train_df$cluster == "A", , drop = FALSE])
