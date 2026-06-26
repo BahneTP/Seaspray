@@ -1,34 +1,16 @@
-import sys
-from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from gmm_r import GMM_R
 from ibi_detection import detect_ibi, plot_ibi_threshold_metrics
-from ibi_detection.common import calculate_upper_marine_limits
-from svm import SVM
-
-
-class Tee():
-    def __init__(self, *streams):
-        self.streams = streams
-
-    def write(self, data):
-        for stream in self.streams:
-            stream.write(data)
-            stream.flush()
-
-    def flush(self):
-        for stream in self.streams:
-            stream.flush()
+from ibi_detection.common import calculate_lower_marine_limits
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
 CONFIG_NR = 4
+SAVE_FILES = False
 
 
 def run_analysis():
@@ -54,49 +36,43 @@ def run_analysis():
     )
 
     # =========================
-    # 3. Run GMM & SVM
+    # 3. Ibi Detection
     # =========================
-    gmm = GMM_R(df_train, feature_cols)
-    df = gmm.save(df)
-
-    # svm = SVM(df_train, df_test, feature_cols)
-    # svm.report()
-    # df = svm.save(df)
-
-    # =========================
-    # 4. Ibi Detection
-    # =========================
-    ibi_detection_mode = "gmm"
+    ibi_detection_mode = 'gmm_inverse_prob' #"gmm_ibi_cluster"
     svm_threshold = 1.0
-    gmm_threshold = 0.18    
+    gmm_threshold = 0.02    
     combined_operator = "or"
-    upper_marine_limit_detection = True
-    upper_marine_limits = calculate_upper_marine_limits(df_train, feature_cols)
+    lower_marine_limit_detection = True
+    lower_marine_limits = calculate_lower_marine_limits(df_train, feature_cols)
 
     df = detect_ibi(
-        df,
+        df_train=df_train,
+        df_eval=df,
+        feature_cols=feature_cols,
         mode=ibi_detection_mode,
         svm_threshold=svm_threshold,
         gmm_threshold=gmm_threshold,
         combined_operator=combined_operator,
-        upper_marine_limit_detection=upper_marine_limit_detection,
-        feature_cols=feature_cols,
-        upper_marine_limits=upper_marine_limits,
+        lower_marine_limit_detection=lower_marine_limit_detection,
+        lower_marine_limits=lower_marine_limits,
     )
-    ibi_metrics = plot_ibi_threshold_metrics(
-        df,
-        mode=ibi_detection_mode,
-        start_threshold=0,
-        end_threshold=1,
-        step_size=0.01,
-        fixed_svm_threshold=svm_threshold,
-        fixed_gmm_threshold=gmm_threshold,
-        combined_operator=combined_operator,
-        upper_marine_limit_detection=upper_marine_limit_detection,
-        feature_cols=feature_cols,
-        upper_marine_limits=upper_marine_limits,
-        output_path=output_dir / f"{CONFIG_NR}_{ibi_detection_mode}_ibi_threshold_metrics.png"
-    )
+    if SAVE_FILES:
+        ibi_metrics = plot_ibi_threshold_metrics(
+            df,
+            mode=ibi_detection_mode,
+            start_threshold=0,
+            end_threshold=1,
+            step_size=0.01,
+            fixed_svm_threshold=svm_threshold,
+            fixed_gmm_threshold=gmm_threshold,
+            combined_operator=combined_operator,
+            lower_marine_limit_detection=lower_marine_limit_detection,
+            feature_cols=feature_cols,
+            lower_marine_limits=lower_marine_limits,
+            df_train=df_train,
+            output_path=output_dir / f"{CONFIG_NR}_{ibi_detection_mode}_ibi_threshold_metrics.png"
+        )
+        ibi_metrics.to_csv(output_dir / "ibi_threshold_metrics.csv", index=False)
 
     # =========================
     # 6. Grid-plot
@@ -109,20 +85,13 @@ def run_analysis():
     # =========================
     # print(df[df["cluster"] == "ibi"])
     print(df)
-    # df.to_csv(output_dir / "analysis.csv", index=False)
-    # ibi_metrics.to_csv(output_dir / "ibi_threshold_metrics.csv", index=False)
+
+    if SAVE_FILES:
+        df.to_csv(output_dir / "analysis.csv", index=False)
 
 
 def main():
-    log_path = PROJECT_ROOT / "output" / str(CONFIG_NR) / f"analysis_{CONFIG_NR}.log"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with log_path.open("w") as log_file:
-        stdout = Tee(sys.stdout, log_file)
-        stderr = Tee(sys.stderr, log_file)
-        with redirect_stdout(stdout), redirect_stderr(stderr):
-            print("Log file:", log_path)
-            run_analysis()
+    run_analysis()
 
 
 if __name__ == "__main__":

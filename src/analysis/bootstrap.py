@@ -1,26 +1,33 @@
 import numpy as np
 import pandas as pd
 
-from gmm_r import GMM_R
 from ibi_detection import detect_ibi
-from ibi_detection.common import calculate_ibi_metrics, calculate_upper_marine_limits
-from ibi_detection.gmm import add_gmm_cluster, find_potential_ibi_cluster
-from svm import SVM
+from ibi_detection.common import calculate_ibi_metrics, calculate_lower_marine_limits
+from ibi_detection.gmm_ibi_cluster import add_gmm_cluster, find_potential_ibi_cluster
+from ibi_detection.herbivorous_mahalanobis import add_herbivorous_mahalanobis
+from models.gmm import run_gmm
+from models.svm import run_svm
 
 
 def _models_for_mode(mode):
     mode = mode.lower()
 
-    if mode == "gmm":
+    if mode in ["gmm", "gmm_ibi_cluster", "gmm_inverse_prob"]:
         return True, False
 
-    if mode == "svm":
+    if mode in ["svm", "svm_margin"]:
         return False, True
 
     if mode == "combined":
         return True, True
 
-    raise ValueError("mode must be one of: 'svm', 'gmm', 'combined'")
+    if mode == "herbivorous_mahalanobis":
+        return False, False
+
+    raise ValueError(
+        "mode must be one of: 'svm', 'gmm', 'gmm_inverse_prob', "
+        "'herbivorous_mahalanobis', 'combined'"
+    )
 
 
 def make_stratified_bootstrap_split(
@@ -57,19 +64,27 @@ def _add_model_outputs(
     df_results = df_eval.copy()
 
     if use_gmm:
-        gmm = GMM_R(df_train, feature_cols)
-        df_results = gmm.save(df_results)
+        df_results = run_gmm(df_train, df_results, feature_cols)
 
     if use_svm:
-        svm = SVM(df_train, df_eval, feature_cols)
-        df_results = svm.save(df_results)
+        df_results = run_svm(df_train, df_results, feature_cols)
+
+    if mode.lower() == "herbivorous_mahalanobis":
+        df_results = add_herbivorous_mahalanobis(
+            df_train,
+            df_results,
+            feature_cols,
+        )
 
     return df_results
 
 
-def _get_potential_ibi_cluster(df_train_model):
+def _get_potential_ibi_cluster(df_train_model, feature_cols):
     df_clustered = add_gmm_cluster(df_train_model)
-    potential_ibi_cluster, _, _ = find_potential_ibi_cluster(df_clustered)
+    potential_ibi_cluster, _, _ = find_potential_ibi_cluster(
+        df_clustered,
+        feature_cols,
+    )
     return potential_ibi_cluster
 
 
@@ -83,22 +98,24 @@ def _calculate_split_metrics(
     gmm_threshold,
     combined_operator,
     potential_ibi_cluster,
-    upper_marine_limit_detection,
+    lower_marine_limit_detection,
     feature_cols,
-    upper_marine_limits,
+    lower_marine_limits,
     best_f1_gmm_threshold=None,
 ):
     df_detected = detect_ibi(
-        df_model,
+        df_train=df_model,
+        df_eval=df_model,
+        feature_cols=feature_cols,
         mode=mode,
         svm_threshold=svm_threshold,
         gmm_threshold=gmm_threshold,
         combined_operator=combined_operator,
         printing=False,
+        df_model=df_model,
         potential_ibi_cluster=potential_ibi_cluster,
-        upper_marine_limit_detection=upper_marine_limit_detection,
-        feature_cols=feature_cols,
-        upper_marine_limits=upper_marine_limits,
+        lower_marine_limit_detection=lower_marine_limit_detection,
+        lower_marine_limits=lower_marine_limits,
     )
     metrics = calculate_ibi_metrics(df_detected)
     metrics["iteration"] = iteration
@@ -136,7 +153,7 @@ def _thresholds_for_mode(
     mode = mode.lower()
 
     if sweep_threshold == "auto":
-        sweep_threshold = "svm" if mode == "combined" else mode
+        sweep_threshold = "svm" if mode in ["svm", "svm_margin", "combined"] else "gmm"
     else:
         sweep_threshold = sweep_threshold.lower()
 
@@ -156,7 +173,7 @@ def _thresholds_for_mode(
 
 
 def _fixed_threshold_for_mode(mode, svm_threshold, gmm_threshold):
-    return svm_threshold if mode.lower() == "svm" else gmm_threshold
+    return svm_threshold if mode.lower() in ["svm", "svm_margin"] else gmm_threshold
 
 
 def _find_best_f1_threshold(
@@ -168,9 +185,9 @@ def _find_best_f1_threshold(
     fixed_gmm_threshold,
     combined_operator,
     potential_ibi_cluster,
-    upper_marine_limit_detection,
+    lower_marine_limit_detection,
     feature_cols,
-    upper_marine_limits,
+    lower_marine_limits,
 ):
     rows = []
 
@@ -183,16 +200,18 @@ def _find_best_f1_threshold(
             fixed_gmm_threshold=fixed_gmm_threshold,
         )
         df_detected = detect_ibi(
-            df_model,
+            df_train=df_model,
+            df_eval=df_model,
+            feature_cols=feature_cols,
             mode=mode,
             svm_threshold=svm_threshold,
             gmm_threshold=gmm_threshold,
             combined_operator=combined_operator,
             printing=False,
+            df_model=df_model,
             potential_ibi_cluster=potential_ibi_cluster,
-            upper_marine_limit_detection=upper_marine_limit_detection,
-            feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
+            lower_marine_limit_detection=lower_marine_limit_detection,
+            lower_marine_limits=lower_marine_limits,
         )
         metrics = calculate_ibi_metrics(df_detected)
         rows.append(
@@ -219,9 +238,9 @@ def _calculate_threshold_metrics(
     fixed_gmm_threshold,
     combined_operator,
     potential_ibi_cluster,
-    upper_marine_limit_detection,
+    lower_marine_limit_detection,
     feature_cols,
-    upper_marine_limits,
+    lower_marine_limits,
 ):
     rows = []
 
@@ -244,9 +263,9 @@ def _calculate_threshold_metrics(
                 gmm_threshold=gmm_threshold,
                 combined_operator=combined_operator,
                 potential_ibi_cluster=potential_ibi_cluster,
-                upper_marine_limit_detection=upper_marine_limit_detection,
+                lower_marine_limit_detection=lower_marine_limit_detection,
                 feature_cols=feature_cols,
-                upper_marine_limits=upper_marine_limits,
+                lower_marine_limits=lower_marine_limits,
             )
         )
 
@@ -264,14 +283,14 @@ def _evaluate_iteration(
     fixed_svm_threshold,
     fixed_gmm_threshold,
     combined_operator,
-    upper_marine_limit_detection,
+    lower_marine_limit_detection,
     include_threshold_metrics=False,
 ):
     use_gmm, _ = _models_for_mode(mode)
-    upper_marine_limits = None
+    lower_marine_limits = None
 
-    if upper_marine_limit_detection:
-        upper_marine_limits = calculate_upper_marine_limits(df_train, feature_cols)
+    if lower_marine_limit_detection:
+        lower_marine_limits = calculate_lower_marine_limits(df_train, feature_cols)
 
     df_train_model = _add_model_outputs(
         df_train=df_train,
@@ -282,7 +301,10 @@ def _evaluate_iteration(
     potential_ibi_cluster = None
 
     if use_gmm:
-        potential_ibi_cluster = _get_potential_ibi_cluster(df_train_model)
+        potential_ibi_cluster = _get_potential_ibi_cluster(
+            df_train_model,
+            feature_cols,
+        )
 
     df_test_model = _add_model_outputs(
         df_train=df_train,
@@ -305,9 +327,9 @@ def _evaluate_iteration(
         fixed_gmm_threshold=fixed_gmm_threshold,
         combined_operator=combined_operator,
         potential_ibi_cluster=potential_ibi_cluster,
-        upper_marine_limit_detection=upper_marine_limit_detection,
+        lower_marine_limit_detection=lower_marine_limit_detection,
         feature_cols=feature_cols,
-        upper_marine_limits=upper_marine_limits,
+        lower_marine_limits=lower_marine_limits,
     )
     best_test_threshold = _find_best_f1_threshold(
         df_model=df_test_model,
@@ -318,9 +340,9 @@ def _evaluate_iteration(
         fixed_gmm_threshold=fixed_gmm_threshold,
         combined_operator=combined_operator,
         potential_ibi_cluster=potential_ibi_cluster,
-        upper_marine_limit_detection=upper_marine_limit_detection,
+        lower_marine_limit_detection=lower_marine_limit_detection,
         feature_cols=feature_cols,
-        upper_marine_limits=upper_marine_limits,
+        lower_marine_limits=lower_marine_limits,
     )
 
     fixed_rows = [
@@ -334,9 +356,9 @@ def _evaluate_iteration(
             gmm_threshold=fixed_gmm_threshold,
             combined_operator=combined_operator,
             potential_ibi_cluster=potential_ibi_cluster,
-            upper_marine_limit_detection=upper_marine_limit_detection,
+            lower_marine_limit_detection=lower_marine_limit_detection,
             feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
+            lower_marine_limits=lower_marine_limits,
             best_f1_gmm_threshold=best_train_threshold,
         ),
         _calculate_split_metrics(
@@ -349,9 +371,9 @@ def _evaluate_iteration(
             gmm_threshold=fixed_gmm_threshold,
             combined_operator=combined_operator,
             potential_ibi_cluster=potential_ibi_cluster,
-            upper_marine_limit_detection=upper_marine_limit_detection,
+            lower_marine_limit_detection=lower_marine_limit_detection,
             feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
+            lower_marine_limits=lower_marine_limits,
             best_f1_gmm_threshold=best_test_threshold,
         ),
     ]
@@ -372,9 +394,9 @@ def _evaluate_iteration(
             fixed_gmm_threshold=fixed_gmm_threshold,
             combined_operator=combined_operator,
             potential_ibi_cluster=potential_ibi_cluster,
-            upper_marine_limit_detection=upper_marine_limit_detection,
+            lower_marine_limit_detection=lower_marine_limit_detection,
             feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
+            lower_marine_limits=lower_marine_limits,
         )
     )
     threshold_rows.extend(
@@ -389,9 +411,9 @@ def _evaluate_iteration(
             fixed_gmm_threshold=fixed_gmm_threshold,
             combined_operator=combined_operator,
             potential_ibi_cluster=potential_ibi_cluster,
-            upper_marine_limit_detection=upper_marine_limit_detection,
+            lower_marine_limit_detection=lower_marine_limit_detection,
             feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
+            lower_marine_limits=lower_marine_limits,
         )
     )
 
@@ -406,7 +428,7 @@ def run_bootstrap_evaluation(
     svm_threshold=1.0,
     gmm_threshold=0.18,
     combined_operator="or",
-    upper_marine_limit_detection=True,
+    lower_marine_limit_detection=True,
     thresholds=None,
     start_threshold=0.0,
     end_threshold=1.0,
@@ -447,7 +469,7 @@ def run_bootstrap_evaluation(
             fixed_svm_threshold=svm_threshold,
             fixed_gmm_threshold=gmm_threshold,
             combined_operator=combined_operator,
-            upper_marine_limit_detection=upper_marine_limit_detection,
+            lower_marine_limit_detection=lower_marine_limit_detection,
             include_threshold_metrics=return_threshold_metrics,
         )
 

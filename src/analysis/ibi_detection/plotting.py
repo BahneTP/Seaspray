@@ -6,10 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from .combined import detect_combined
 from .common import calculate_ibi_metrics
-from .gmm import detect_gmm
-from .svm import detect_svm
+from .ibi_detection import detect_ibi
 
 
 def _detect_ibi_for_plot(
@@ -18,43 +16,23 @@ def _detect_ibi_for_plot(
     svm_threshold,
     gmm_threshold,
     combined_operator,
-    upper_marine_limit_detection=False,
+    lower_marine_limit_detection=False,
     feature_cols=None,
-    upper_marine_limits=None,
+    lower_marine_limits=None,
+    df_train=None,
 ):
-    if mode == "svm":
-        return detect_svm(
-            df,
-            threshold=svm_threshold,
-            printing=False,
-            upper_marine_limit_detection=upper_marine_limit_detection,
-            feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
-        )
-
-    if mode == "gmm":
-        return detect_gmm(
-            df,
-            threshold=gmm_threshold,
-            printing=False,
-            upper_marine_limit_detection=upper_marine_limit_detection,
-            feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
-        )
-
-    if mode == "combined":
-        return detect_combined(
-            df,
-            svm_threshold=svm_threshold,
-            gmm_threshold=gmm_threshold,
-            operator=combined_operator,
-            printing=False,
-            upper_marine_limit_detection=upper_marine_limit_detection,
-            feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
-        )
-
-    raise ValueError("mode must be one of: 'svm', 'gmm', 'combined'")
+    return detect_ibi(
+        df_train=df_train if df_train is not None else df,
+        df_eval=df,
+        feature_cols=feature_cols,
+        mode=mode,
+        svm_threshold=svm_threshold,
+        gmm_threshold=gmm_threshold,
+        combined_operator=combined_operator,
+        printing=False,
+        lower_marine_limit_detection=lower_marine_limit_detection,
+        lower_marine_limits=lower_marine_limits,
+    )
 
 
 def plot_ibi_threshold_metrics(
@@ -68,16 +46,17 @@ def plot_ibi_threshold_metrics(
     fixed_gmm_threshold=0.2,
     combined_operator="or",
     sweep_threshold="auto",
-    upper_marine_limit_detection=False,
+    lower_marine_limit_detection=False,
     feature_cols=None,
-    upper_marine_limits=None,
+    lower_marine_limits=None,
+    df_train=None,
 ):
     rows = []
     thresholds = np.arange(start_threshold, end_threshold + step_size / 2, step_size)
     mode = mode.lower()
 
     if sweep_threshold == "auto":
-        sweep_threshold = "svm" if mode == "combined" else mode
+        sweep_threshold = "svm" if mode in ["svm", "svm_margin", "combined"] else "gmm"
     else:
         sweep_threshold = sweep_threshold.lower()
 
@@ -100,9 +79,10 @@ def plot_ibi_threshold_metrics(
             svm_threshold=svm_threshold,
             gmm_threshold=gmm_threshold,
             combined_operator=combined_operator,
-            upper_marine_limit_detection=upper_marine_limit_detection,
+            lower_marine_limit_detection=lower_marine_limit_detection,
             feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
+            lower_marine_limits=lower_marine_limits,
+            df_train=df_train,
         )
         metrics = calculate_ibi_metrics(df_threshold)
         metrics["threshold"] = threshold

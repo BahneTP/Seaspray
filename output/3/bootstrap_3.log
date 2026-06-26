@@ -1,0 +1,31 @@
+Log file: /zfshome/sunle073/Seaspray/output/3/bootstrap_3.log
+
+Bootstrap plot saved to: /zfshome/sunle073/Seaspray/output/3/3_herbivorous_mahalanobis_bootstrap_threshold_metrics.png
+Bootstrap iterations: 10
+Threshold range: 0 to 1
+Threshold step size: 0.01
+Metrics saved to: /zfshome/sunle073/Seaspray/output/3/3_herbivorous_mahalanobis_bootstrap_metrics.csv
+Summary saved to: /zfshome/sunle073/Seaspray/output/3/3_herbivorous_mahalanobis_bootstrap_summary.csv
+Threshold summary saved to: /zfshome/sunle073/Seaspray/output/3/3_herbivorous_mahalanobis_bootstrap_threshold_summary.csv
+Threshold plot saved to: /zfshome/sunle073/Seaspray/output/3/3_herbivorous_mahalanobis_bootstrap_threshold_metrics.png
+
+Bootstrap summary:
+    split                 metric        mean       std         min         max        q025        q975
+0    test               accuracy    0.052492  0.010237    0.038961    0.071895    0.039255    0.070235
+1    test              precision    0.047667  0.008285    0.038961    0.065789    0.039018    0.062752
+2    test                 recall    1.000000  0.000000    1.000000    1.000000    1.000000    1.000000
+3    test               f1_score    0.090891  0.015000    0.075000    0.123457    0.075106    0.118039
+4    test           detected_ibi  153.300000  6.254776  144.000000  168.000000  145.125000  165.300000
+5    test               true_ibi    7.300000  1.251666    6.000000   10.000000    6.000000    9.550000
+6    test            correct_ibi    7.300000  1.251666    6.000000   10.000000    6.000000    9.550000
+7    test     false_positive_ibi  146.000000  6.306963  137.000000  161.000000  138.125000  158.075000
+8    test  best_f1_gmm_threshold    0.641000  0.162785    0.400000    0.840000    0.404500    0.835500
+9   train               accuracy    0.052381  0.003888    0.047619    0.057143    0.047619    0.057143
+10  train              precision    0.047848  0.000187    0.047619    0.048077    0.047619    0.048077
+11  train                 recall    1.000000  0.000000    1.000000    1.000000    1.000000    1.000000
+12  train               f1_score    0.091325  0.000341    0.090909    0.091743    0.090909    0.091743
+13  train           detected_ibi  418.000000  1.632993  416.000000  420.000000  416.000000  420.000000
+14  train               true_ibi   20.000000  0.000000   20.000000   20.000000   20.000000   20.000000
+15  train            correct_ibi   20.000000  0.000000   20.000000   20.000000   20.000000   20.000000
+16  train     false_positive_ibi  398.000000  1.632993  396.000000  400.000000  396.000000  400.000000
+17  train  best_f1_gmm_threshold    0.732000  0.161438    0.430000    0.890000    0.445750    0.883250

@@ -1,0 +1,31 @@
+Log file: /zfshome/sunle073/Seaspray/output/5/bootstrap_5.log
+
+Bootstrap plot saved to: /zfshome/sunle073/Seaspray/output/5/5_gmm_inverse_prob_bootstrap_threshold_metrics.png
+Bootstrap iterations: 10
+Threshold range: 0 to 1
+Threshold step size: 0.01
+Metrics saved to: /zfshome/sunle073/Seaspray/output/5/5_gmm_inverse_prob_bootstrap_metrics.csv
+Summary saved to: /zfshome/sunle073/Seaspray/output/5/5_gmm_inverse_prob_bootstrap_summary.csv
+Threshold summary saved to: /zfshome/sunle073/Seaspray/output/5/5_gmm_inverse_prob_bootstrap_threshold_summary.csv
+Threshold plot saved to: /zfshome/sunle073/Seaspray/output/5/5_gmm_inverse_prob_bootstrap_threshold_metrics.png
+
+Bootstrap summary:
+    split                 metric       mean        std        min         max       q025        q975
+0    test               accuracy   0.903982   0.108674   0.632258    0.973154   0.668247    0.971253
+1    test              precision   0.416667   0.504608   0.000000    1.000000   0.000000    1.000000
+2    test                 recall   0.086905   0.109368   0.000000    0.333333   0.000000    0.290476
+3    test               f1_score   0.134829   0.167712   0.000000    0.500000   0.000000    0.443750
+4    test           detected_ibi   8.700000  16.207337   0.000000   49.000000   0.000000   43.825000
+5    test               true_ibi   7.300000   1.251666   6.000000   10.000000   6.000000    9.550000
+6    test            correct_ibi   0.600000   0.699206   0.000000    2.000000   0.000000    1.775000
+7    test     false_positive_ibi   8.100000  16.488717   0.000000   49.000000   0.000000   43.825000
+8    test  best_f1_gmm_threshold   0.053000   0.063078   0.000000    0.200000   0.000000    0.177500
+9   train               accuracy   0.903095   0.100396   0.661905    0.959524   0.688155    0.957917
+10  train              precision   0.136667   0.312872   0.000000    1.000000   0.000000    0.820000
+11  train                 recall   0.030000   0.053748   0.000000    0.150000   0.000000    0.138750
+12  train               f1_score   0.047113   0.087909   0.000000    0.260870   0.000000    0.232174
+13  train           detected_ibi  21.900000  41.599813   0.000000  122.000000   0.000000  110.975000
+14  train               true_ibi  20.000000   0.000000  20.000000   20.000000  20.000000   20.000000
+15  train            correct_ibi   0.600000   1.074968   0.000000    3.000000   0.000000    2.775000
+16  train     false_positive_ibi  21.300000  41.870302   0.000000  122.000000   0.000000  110.975000
+17  train  best_f1_gmm_threshold   0.044000   0.075895   0.000000    0.250000   0.000000    0.207250

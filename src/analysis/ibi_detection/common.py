@@ -19,7 +19,7 @@ def calculate_ibi_metrics(df):
     }
 
 
-def calculate_upper_marine_limits(
+def calculate_lower_marine_limits(
     df,
     feature_cols,
     marine_label="piscivorous",
@@ -32,45 +32,79 @@ def calculate_upper_marine_limits(
     return marine[feature_cols].min()
 
 
-def get_upper_marine_limit_mask(
+def calculate_upper_marine_limits(
     df,
     feature_cols,
-    upper_marine_limits,
     marine_label="piscivorous",
 ):
-    if upper_marine_limits is None:
-        upper_marine_limits = calculate_upper_marine_limits(
+    return calculate_lower_marine_limits(
+        df,
+        feature_cols,
+        marine_label=marine_label,
+    )
+
+
+def get_lower_marine_limit_mask(
+    df,
+    feature_cols,
+    lower_marine_limits,
+    marine_label="piscivorous",
+):
+    if lower_marine_limits is None:
+        lower_marine_limits = calculate_lower_marine_limits(
             df,
             feature_cols,
             marine_label=marine_label,
         )
 
     non_marine = df["cluster"] != marine_label
-    above_all_limits = (df[feature_cols] >= upper_marine_limits).all(axis=1)
+    above_all_limits = (df[feature_cols] >= lower_marine_limits).all(axis=1)
 
     return non_marine & above_all_limits
+
+
+def get_upper_marine_limit_mask(
+    df,
+    feature_cols,
+    upper_marine_limits,
+    marine_label="piscivorous",
+):
+    return get_lower_marine_limit_mask(
+        df,
+        feature_cols=feature_cols,
+        lower_marine_limits=upper_marine_limits,
+        marine_label=marine_label,
+    )
 
 
 def add_ibi_prediction(
     df,
     mask,
+    lower_marine_limit_detection=False,
+    lower_marine_limits=None,
     upper_marine_limit_detection=False,
     feature_cols=None,
     upper_marine_limits=None,
     marine_label="piscivorous",
 ):
     df_results = df.copy()
+    use_marine_limit_detection = (
+        lower_marine_limit_detection or upper_marine_limit_detection
+    )
 
-    if upper_marine_limit_detection:
+    if lower_marine_limits is None:
+        lower_marine_limits = upper_marine_limits
+
+    if use_marine_limit_detection:
         if feature_cols is None:
             raise ValueError(
-                "feature_cols must be provided when upper_marine_limit_detection is enabled."
+                "feature_cols must be provided when marine limit detection is enabled."
             )
 
-        mask = mask | get_upper_marine_limit_mask(
+        mask = mask | get_lower_marine_limit_mask(
             df_results,
             feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
+            lower_marine_limits=lower_marine_limits,
             marine_label=marine_label,
         )
 
