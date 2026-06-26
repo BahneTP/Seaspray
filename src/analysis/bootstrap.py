@@ -78,6 +78,7 @@ def _calculate_split_metrics(
     mode,
     split_name,
     iteration,
+    threshold,
     svm_threshold,
     gmm_threshold,
     combined_operator,
@@ -101,9 +102,53 @@ def _calculate_split_metrics(
     metrics = calculate_ibi_metrics(df_detected)
     metrics["iteration"] = iteration
     metrics["split"] = split_name
+    metrics["threshold"] = threshold
+    metrics["svm_threshold"] = svm_threshold
+    metrics["gmm_threshold"] = gmm_threshold
     metrics["n_rows"] = len(df_detected)
 
     return metrics
+
+
+def _threshold_values(
+    thresholds,
+    start_threshold,
+    end_threshold,
+    step_size,
+):
+    if thresholds is not None:
+        return np.array(thresholds, dtype=float)
+
+    return np.arange(start_threshold, end_threshold + step_size / 2, step_size)
+
+
+def _thresholds_for_mode(
+    mode,
+    threshold,
+    sweep_threshold,
+    fixed_svm_threshold,
+    fixed_gmm_threshold,
+):
+    mode = mode.lower()
+
+    if sweep_threshold == "auto":
+        sweep_threshold = "svm" if mode == "combined" else mode
+    else:
+        sweep_threshold = sweep_threshold.lower()
+
+    if sweep_threshold not in ["svm", "gmm", "both"]:
+        raise ValueError("sweep_threshold must be one of: 'auto', 'svm', 'gmm', 'both'")
+
+    svm_threshold = fixed_svm_threshold
+    gmm_threshold = fixed_gmm_threshold
+
+    if sweep_threshold in ["svm", "both"]:
+        svm_threshold = threshold
+
+    if sweep_threshold in ["gmm", "both"]:
+        gmm_threshold = threshold
+
+    return svm_threshold, gmm_threshold
 
 
 def _evaluate_iteration(
@@ -112,8 +157,10 @@ def _evaluate_iteration(
     feature_cols,
     mode,
     iteration,
-    svm_threshold,
-    gmm_threshold,
+    threshold_values,
+    sweep_threshold,
+    fixed_svm_threshold,
+    fixed_gmm_threshold,
     combined_operator,
     upper_marine_limit_detection,
 ):
@@ -141,34 +188,51 @@ def _evaluate_iteration(
         mode=mode,
     )
 
-    return [
-        _calculate_split_metrics(
-            df_model=df_train_model,
+    rows = []
+
+    for threshold in threshold_values:
+        svm_threshold, gmm_threshold = _thresholds_for_mode(
             mode=mode,
-            split_name="train",
-            iteration=iteration,
-            svm_threshold=svm_threshold,
-            gmm_threshold=gmm_threshold,
-            combined_operator=combined_operator,
-            potential_ibi_cluster=potential_ibi_cluster,
-            upper_marine_limit_detection=upper_marine_limit_detection,
-            feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
-        ),
-        _calculate_split_metrics(
-            df_model=df_test_model,
-            mode=mode,
-            split_name="test",
-            iteration=iteration,
-            svm_threshold=svm_threshold,
-            gmm_threshold=gmm_threshold,
-            combined_operator=combined_operator,
-            potential_ibi_cluster=potential_ibi_cluster,
-            upper_marine_limit_detection=upper_marine_limit_detection,
-            feature_cols=feature_cols,
-            upper_marine_limits=upper_marine_limits,
-        ),
-    ]
+            threshold=threshold,
+            sweep_threshold=sweep_threshold,
+            fixed_svm_threshold=fixed_svm_threshold,
+            fixed_gmm_threshold=fixed_gmm_threshold,
+        )
+
+        rows.append(
+            _calculate_split_metrics(
+                df_model=df_train_model,
+                mode=mode,
+                split_name="train",
+                iteration=iteration,
+                threshold=threshold,
+                svm_threshold=svm_threshold,
+                gmm_threshold=gmm_threshold,
+                combined_operator=combined_operator,
+                potential_ibi_cluster=potential_ibi_cluster,
+                upper_marine_limit_detection=upper_marine_limit_detection,
+                feature_cols=feature_cols,
+                upper_marine_limits=upper_marine_limits,
+            )
+        )
+        rows.append(
+            _calculate_split_metrics(
+                df_model=df_test_model,
+                mode=mode,
+                split_name="test",
+                iteration=iteration,
+                threshold=threshold,
+                svm_threshold=svm_threshold,
+                gmm_threshold=gmm_threshold,
+                combined_operator=combined_operator,
+                potential_ibi_cluster=potential_ibi_cluster,
+                upper_marine_limit_detection=upper_marine_limit_detection,
+                feature_cols=feature_cols,
+                upper_marine_limits=upper_marine_limits,
+            )
+        )
+
+    return rows
 
 
 def run_bootstrap_evaluation(
@@ -180,10 +244,21 @@ def run_bootstrap_evaluation(
     gmm_threshold=0.18,
     combined_operator="or",
     upper_marine_limit_detection=True,
+    thresholds=None,
+    start_threshold=0.0,
+    end_threshold=1.0,
+    step_size=0.01,
+    sweep_threshold="auto",
     random_state=42,
 ):
     rows = []
     rng = np.random.default_rng(random_state)
+    threshold_values = _threshold_values(
+        thresholds=thresholds,
+        start_threshold=start_threshold,
+        end_threshold=end_threshold,
+        step_size=step_size,
+    )
 
     for iteration in range(n_iterations):
         split_seed = int(rng.integers(0, np.iinfo(np.int32).max))
@@ -203,8 +278,10 @@ def run_bootstrap_evaluation(
                 feature_cols=feature_cols,
                 mode=mode,
                 iteration=iteration,
-                svm_threshold=svm_threshold,
-                gmm_threshold=gmm_threshold,
+                threshold_values=threshold_values,
+                sweep_threshold=sweep_threshold,
+                fixed_svm_threshold=svm_threshold,
+                fixed_gmm_threshold=gmm_threshold,
                 combined_operator=combined_operator,
                 upper_marine_limit_detection=upper_marine_limit_detection,
             )
@@ -226,12 +303,13 @@ def summarize_bootstrap_metrics(metrics_df):
     ]
     rows = []
 
-    for split_name, split_df in metrics_df.groupby("split"):
+    for (split_name, threshold), split_df in metrics_df.groupby(["split", "threshold"]):
         for metric in metric_cols:
             values = split_df[metric].to_numpy(dtype=float)
             rows.append(
                 {
                     "split": split_name,
+                    "threshold": threshold,
                     "metric": metric,
                     "mean": np.mean(values),
                     "std": np.std(values, ddof=1) if len(values) > 1 else 0.0,
@@ -243,3 +321,17 @@ def summarize_bootstrap_metrics(metrics_df):
             )
 
     return pd.DataFrame(rows)
+
+
+def summarize_best_f1_threshold(summary_df):
+    rows = []
+
+    for split_name, split_df in summary_df.groupby("split"):
+        f1_rows = split_df[split_df["metric"] == "f1_score"]
+        best_f1_row = f1_rows.loc[f1_rows["mean"].idxmax()]
+        best_threshold = best_f1_row["threshold"]
+        best_metrics = split_df[split_df["threshold"] == best_threshold].copy()
+        best_metrics["best_f1_threshold"] = best_threshold
+        rows.append(best_metrics)
+
+    return pd.concat(rows, ignore_index=True)

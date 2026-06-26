@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from bootstrap import run_bootstrap_evaluation, summarize_bootstrap_metrics
+from bootstrap import (
+    run_bootstrap_evaluation,
+    summarize_best_f1_threshold,
+    summarize_bootstrap_metrics,
+)
 
 
 class Tee():
@@ -40,6 +44,10 @@ def run_bootstrap_analysis():
     combined_operator = "or"
     upper_marine_limit_detection = True
     n_iterations = 10
+    start_threshold = 0
+    end_threshold = 1
+    step_size = 0.01
+    sweep_threshold = "auto"
     random_state = 42
 
     metrics_df = run_bootstrap_evaluation(
@@ -51,20 +59,32 @@ def run_bootstrap_analysis():
         gmm_threshold=gmm_threshold,
         combined_operator=combined_operator,
         upper_marine_limit_detection=upper_marine_limit_detection,
+        start_threshold=start_threshold,
+        end_threshold=end_threshold,
+        step_size=step_size,
+        sweep_threshold=sweep_threshold,
         random_state=random_state,
     )
     summary_df = summarize_bootstrap_metrics(metrics_df)
+    best_f1_df = summarize_best_f1_threshold(summary_df)
 
     metrics_path = output_dir / f"{CONFIG_NR}_{ibi_detection_mode}_bootstrap_metrics.csv"
     summary_path = output_dir / f"{CONFIG_NR}_{ibi_detection_mode}_bootstrap_summary.csv"
+    best_f1_path = output_dir / f"{CONFIG_NR}_{ibi_detection_mode}_bootstrap_best_f1.csv"
     metrics_df.to_csv(metrics_path, index=False)
     summary_df.to_csv(summary_path, index=False)
+    best_f1_df.to_csv(best_f1_path, index=False)
 
     print("Bootstrap iterations:", n_iterations)
+    print("Threshold range:", start_threshold, "to", end_threshold)
+    print("Threshold step size:", step_size)
     print("Metrics saved to:", metrics_path)
     print("Summary saved to:", summary_path)
+    print("Best F1 metrics saved to:", best_f1_path)
     print("\nBootstrap summary:")
     print(summary_df)
+    print("\nBest F1 threshold metrics:")
+    print(best_f1_df)
 
 
 def main():
