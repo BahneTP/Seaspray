@@ -86,6 +86,7 @@ def _calculate_split_metrics(
     upper_marine_limit_detection,
     feature_cols,
     upper_marine_limits,
+    best_f1_gmm_threshold=None,
 ):
     df_detected = detect_ibi(
         df_model,
@@ -106,6 +107,9 @@ def _calculate_split_metrics(
     metrics["svm_threshold"] = svm_threshold
     metrics["gmm_threshold"] = gmm_threshold
     metrics["n_rows"] = len(df_detected)
+
+    if best_f1_gmm_threshold is not None:
+        metrics["best_f1_gmm_threshold"] = best_f1_gmm_threshold
 
     return metrics
 
@@ -151,6 +155,104 @@ def _thresholds_for_mode(
     return svm_threshold, gmm_threshold
 
 
+def _fixed_threshold_for_mode(mode, svm_threshold, gmm_threshold):
+    return svm_threshold if mode.lower() == "svm" else gmm_threshold
+
+
+def _find_best_f1_threshold(
+    df_model,
+    mode,
+    threshold_values,
+    sweep_threshold,
+    fixed_svm_threshold,
+    fixed_gmm_threshold,
+    combined_operator,
+    potential_ibi_cluster,
+    upper_marine_limit_detection,
+    feature_cols,
+    upper_marine_limits,
+):
+    rows = []
+
+    for threshold in threshold_values:
+        svm_threshold, gmm_threshold = _thresholds_for_mode(
+            mode=mode,
+            threshold=threshold,
+            sweep_threshold=sweep_threshold,
+            fixed_svm_threshold=fixed_svm_threshold,
+            fixed_gmm_threshold=fixed_gmm_threshold,
+        )
+        df_detected = detect_ibi(
+            df_model,
+            mode=mode,
+            svm_threshold=svm_threshold,
+            gmm_threshold=gmm_threshold,
+            combined_operator=combined_operator,
+            printing=False,
+            potential_ibi_cluster=potential_ibi_cluster,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
+        )
+        metrics = calculate_ibi_metrics(df_detected)
+        rows.append(
+            {
+                "threshold": threshold,
+                "f1_score": metrics["f1_score"],
+            }
+        )
+
+    threshold_metrics = pd.DataFrame(rows)
+    best_row = threshold_metrics.loc[threshold_metrics["f1_score"].idxmax()]
+
+    return best_row["threshold"]
+
+
+def _calculate_threshold_metrics(
+    df_model,
+    mode,
+    split_name,
+    iteration,
+    threshold_values,
+    sweep_threshold,
+    fixed_svm_threshold,
+    fixed_gmm_threshold,
+    combined_operator,
+    potential_ibi_cluster,
+    upper_marine_limit_detection,
+    feature_cols,
+    upper_marine_limits,
+):
+    rows = []
+
+    for threshold in threshold_values:
+        svm_threshold, gmm_threshold = _thresholds_for_mode(
+            mode=mode,
+            threshold=threshold,
+            sweep_threshold=sweep_threshold,
+            fixed_svm_threshold=fixed_svm_threshold,
+            fixed_gmm_threshold=fixed_gmm_threshold,
+        )
+        rows.append(
+            _calculate_split_metrics(
+                df_model=df_model,
+                mode=mode,
+                split_name=split_name,
+                iteration=iteration,
+                threshold=threshold,
+                svm_threshold=svm_threshold,
+                gmm_threshold=gmm_threshold,
+                combined_operator=combined_operator,
+                potential_ibi_cluster=potential_ibi_cluster,
+                upper_marine_limit_detection=upper_marine_limit_detection,
+                feature_cols=feature_cols,
+                upper_marine_limits=upper_marine_limits,
+            )
+        )
+
+    return rows
+
+
 def _evaluate_iteration(
     df_train,
     df_test,
@@ -163,6 +265,7 @@ def _evaluate_iteration(
     fixed_gmm_threshold,
     combined_operator,
     upper_marine_limit_detection,
+    include_threshold_metrics=False,
 ):
     use_gmm, _ = _models_for_mode(mode)
     upper_marine_limits = None
@@ -188,51 +291,111 @@ def _evaluate_iteration(
         mode=mode,
     )
 
-    rows = []
+    fixed_threshold = _fixed_threshold_for_mode(
+        mode=mode,
+        svm_threshold=fixed_svm_threshold,
+        gmm_threshold=fixed_gmm_threshold,
+    )
+    best_train_threshold = _find_best_f1_threshold(
+        df_model=df_train_model,
+        mode=mode,
+        threshold_values=threshold_values,
+        sweep_threshold=sweep_threshold,
+        fixed_svm_threshold=fixed_svm_threshold,
+        fixed_gmm_threshold=fixed_gmm_threshold,
+        combined_operator=combined_operator,
+        potential_ibi_cluster=potential_ibi_cluster,
+        upper_marine_limit_detection=upper_marine_limit_detection,
+        feature_cols=feature_cols,
+        upper_marine_limits=upper_marine_limits,
+    )
+    best_test_threshold = _find_best_f1_threshold(
+        df_model=df_test_model,
+        mode=mode,
+        threshold_values=threshold_values,
+        sweep_threshold=sweep_threshold,
+        fixed_svm_threshold=fixed_svm_threshold,
+        fixed_gmm_threshold=fixed_gmm_threshold,
+        combined_operator=combined_operator,
+        potential_ibi_cluster=potential_ibi_cluster,
+        upper_marine_limit_detection=upper_marine_limit_detection,
+        feature_cols=feature_cols,
+        upper_marine_limits=upper_marine_limits,
+    )
 
-    for threshold in threshold_values:
-        svm_threshold, gmm_threshold = _thresholds_for_mode(
+    fixed_rows = [
+        _calculate_split_metrics(
+            df_model=df_train_model,
             mode=mode,
-            threshold=threshold,
+            split_name="train",
+            iteration=iteration,
+            threshold=fixed_threshold,
+            svm_threshold=fixed_svm_threshold,
+            gmm_threshold=fixed_gmm_threshold,
+            combined_operator=combined_operator,
+            potential_ibi_cluster=potential_ibi_cluster,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
+            best_f1_gmm_threshold=best_train_threshold,
+        ),
+        _calculate_split_metrics(
+            df_model=df_test_model,
+            mode=mode,
+            split_name="test",
+            iteration=iteration,
+            threshold=fixed_threshold,
+            svm_threshold=fixed_svm_threshold,
+            gmm_threshold=fixed_gmm_threshold,
+            combined_operator=combined_operator,
+            potential_ibi_cluster=potential_ibi_cluster,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
+            best_f1_gmm_threshold=best_test_threshold,
+        ),
+    ]
+
+    if not include_threshold_metrics:
+        return fixed_rows
+
+    threshold_rows = []
+    threshold_rows.extend(
+        _calculate_threshold_metrics(
+            df_model=df_train_model,
+            mode=mode,
+            split_name="train",
+            iteration=iteration,
+            threshold_values=threshold_values,
             sweep_threshold=sweep_threshold,
             fixed_svm_threshold=fixed_svm_threshold,
             fixed_gmm_threshold=fixed_gmm_threshold,
+            combined_operator=combined_operator,
+            potential_ibi_cluster=potential_ibi_cluster,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
         )
+    )
+    threshold_rows.extend(
+        _calculate_threshold_metrics(
+            df_model=df_test_model,
+            mode=mode,
+            split_name="test",
+            iteration=iteration,
+            threshold_values=threshold_values,
+            sweep_threshold=sweep_threshold,
+            fixed_svm_threshold=fixed_svm_threshold,
+            fixed_gmm_threshold=fixed_gmm_threshold,
+            combined_operator=combined_operator,
+            potential_ibi_cluster=potential_ibi_cluster,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
+        )
+    )
 
-        rows.append(
-            _calculate_split_metrics(
-                df_model=df_train_model,
-                mode=mode,
-                split_name="train",
-                iteration=iteration,
-                threshold=threshold,
-                svm_threshold=svm_threshold,
-                gmm_threshold=gmm_threshold,
-                combined_operator=combined_operator,
-                potential_ibi_cluster=potential_ibi_cluster,
-                upper_marine_limit_detection=upper_marine_limit_detection,
-                feature_cols=feature_cols,
-                upper_marine_limits=upper_marine_limits,
-            )
-        )
-        rows.append(
-            _calculate_split_metrics(
-                df_model=df_test_model,
-                mode=mode,
-                split_name="test",
-                iteration=iteration,
-                threshold=threshold,
-                svm_threshold=svm_threshold,
-                gmm_threshold=gmm_threshold,
-                combined_operator=combined_operator,
-                potential_ibi_cluster=potential_ibi_cluster,
-                upper_marine_limit_detection=upper_marine_limit_detection,
-                feature_cols=feature_cols,
-                upper_marine_limits=upper_marine_limits,
-            )
-        )
-
-    return rows
+    return fixed_rows, threshold_rows
 
 
 def run_bootstrap_evaluation(
@@ -250,8 +413,10 @@ def run_bootstrap_evaluation(
     step_size=0.01,
     sweep_threshold="auto",
     random_state=42,
+    return_threshold_metrics=False,
 ):
     rows = []
+    threshold_rows = []
     rng = np.random.default_rng(random_state)
     threshold_values = _threshold_values(
         thresholds=thresholds,
@@ -271,23 +436,34 @@ def run_bootstrap_evaluation(
         if df_test.empty:
             continue
 
-        rows.extend(
-            _evaluate_iteration(
-                df_train=df_train,
-                df_test=df_test,
-                feature_cols=feature_cols,
-                mode=mode,
-                iteration=iteration,
-                threshold_values=threshold_values,
-                sweep_threshold=sweep_threshold,
-                fixed_svm_threshold=svm_threshold,
-                fixed_gmm_threshold=gmm_threshold,
-                combined_operator=combined_operator,
-                upper_marine_limit_detection=upper_marine_limit_detection,
-            )
+        iteration_results = _evaluate_iteration(
+            df_train=df_train,
+            df_test=df_test,
+            feature_cols=feature_cols,
+            mode=mode,
+            iteration=iteration,
+            threshold_values=threshold_values,
+            sweep_threshold=sweep_threshold,
+            fixed_svm_threshold=svm_threshold,
+            fixed_gmm_threshold=gmm_threshold,
+            combined_operator=combined_operator,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            include_threshold_metrics=return_threshold_metrics,
         )
 
-    return pd.DataFrame(rows)
+        if return_threshold_metrics:
+            fixed_rows, iteration_threshold_rows = iteration_results
+            rows.extend(fixed_rows)
+            threshold_rows.extend(iteration_threshold_rows)
+        else:
+            rows.extend(iteration_results)
+
+    metrics_df = pd.DataFrame(rows)
+
+    if return_threshold_metrics:
+        return metrics_df, pd.DataFrame(threshold_rows)
+
+    return metrics_df
 
 
 def summarize_bootstrap_metrics(metrics_df):
@@ -300,10 +476,34 @@ def summarize_bootstrap_metrics(metrics_df):
         "true_ibi",
         "correct_ibi",
         "false_positive_ibi",
+        "best_f1_gmm_threshold",
     ]
     rows = []
 
-    for (split_name, threshold), split_df in metrics_df.groupby(["split", "threshold"]):
+    for split_name, split_df in metrics_df.groupby("split"):
+        for metric in metric_cols:
+            values = split_df[metric].to_numpy(dtype=float)
+            rows.append(
+                {
+                    "split": split_name,
+                    "metric": metric,
+                    "mean": np.mean(values),
+                    "std": np.std(values, ddof=1) if len(values) > 1 else 0.0,
+                    "min": np.min(values),
+                    "max": np.max(values),
+                    "q025": np.quantile(values, 0.025),
+                    "q975": np.quantile(values, 0.975),
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
+def summarize_bootstrap_threshold_metrics(threshold_metrics_df):
+    metric_cols = ["accuracy", "precision", "recall", "f1_score"]
+    rows = []
+
+    for (split_name, threshold), split_df in threshold_metrics_df.groupby(["split", "threshold"]):
         for metric in metric_cols:
             values = split_df[metric].to_numpy(dtype=float)
             rows.append(
@@ -321,17 +521,3 @@ def summarize_bootstrap_metrics(metrics_df):
             )
 
     return pd.DataFrame(rows)
-
-
-def summarize_best_f1_threshold(summary_df):
-    rows = []
-
-    for split_name, split_df in summary_df.groupby("split"):
-        f1_rows = split_df[split_df["metric"] == "f1_score"]
-        best_f1_row = f1_rows.loc[f1_rows["mean"].idxmax()]
-        best_threshold = best_f1_row["threshold"]
-        best_metrics = split_df[split_df["threshold"] == best_threshold].copy()
-        best_metrics["best_f1_threshold"] = best_threshold
-        rows.append(best_metrics)
-
-    return pd.concat(rows, ignore_index=True)

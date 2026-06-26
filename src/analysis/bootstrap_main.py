@@ -6,9 +6,10 @@ import pandas as pd
 
 from bootstrap import (
     run_bootstrap_evaluation,
-    summarize_best_f1_threshold,
     summarize_bootstrap_metrics,
+    summarize_bootstrap_threshold_metrics,
 )
+from ibi_detection.plotting import plot_bootstrap_metrics
 
 
 class Tee():
@@ -27,13 +28,13 @@ class Tee():
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
-CONFIG_NR = 6
+CONFIG_NR = 5
 
 
-def run_bootstrap_analysis():
-    output_dir = PROJECT_ROOT / "output" / str(CONFIG_NR)
+def run_bootstrap_analysis(config_nr=CONFIG_NR):
+    output_dir = PROJECT_ROOT / "output" / str(config_nr)
     output_dir.mkdir(parents=True, exist_ok=True)
-    dataset_path = output_dir / f"{CONFIG_NR}.csv"
+    dataset_path = output_dir / f"{config_nr}.csv"
 
     df = pd.read_csv(dataset_path)
     feature_cols = ["δ13C coll", "δ15N coll", "δ13C carb", "δ18O carb"]
@@ -50,7 +51,7 @@ def run_bootstrap_analysis():
     sweep_threshold = "auto"
     random_state = 42
 
-    metrics_df = run_bootstrap_evaluation(
+    metrics_df, threshold_metrics_df = run_bootstrap_evaluation(
         df=df,
         feature_cols=feature_cols,
         mode=ibi_detection_mode,
@@ -64,31 +65,37 @@ def run_bootstrap_analysis():
         step_size=step_size,
         sweep_threshold=sweep_threshold,
         random_state=random_state,
+        return_threshold_metrics=True,
     )
     summary_df = summarize_bootstrap_metrics(metrics_df)
-    best_f1_df = summarize_best_f1_threshold(summary_df)
+    threshold_summary_df = summarize_bootstrap_threshold_metrics(threshold_metrics_df)
 
-    metrics_path = output_dir / f"{CONFIG_NR}_{ibi_detection_mode}_bootstrap_metrics.csv"
-    summary_path = output_dir / f"{CONFIG_NR}_{ibi_detection_mode}_bootstrap_summary.csv"
-    best_f1_path = output_dir / f"{CONFIG_NR}_{ibi_detection_mode}_bootstrap_best_f1.csv"
+    metrics_path = output_dir / f"{config_nr}_{ibi_detection_mode}_bootstrap_metrics.csv"
+    summary_path = output_dir / f"{config_nr}_{ibi_detection_mode}_bootstrap_summary.csv"
+    threshold_summary_path = output_dir / f"{config_nr}_{ibi_detection_mode}_bootstrap_threshold_summary.csv"
+    threshold_plot_path = output_dir / f"{config_nr}_{ibi_detection_mode}_bootstrap_threshold_metrics.png"
     metrics_df.to_csv(metrics_path, index=False)
     summary_df.to_csv(summary_path, index=False)
-    best_f1_df.to_csv(best_f1_path, index=False)
+    threshold_summary_df.to_csv(threshold_summary_path, index=False)
+    plot_bootstrap_metrics(
+        threshold_summary_df[threshold_summary_df["split"] == "test"],
+        output_path=threshold_plot_path,
+    )
 
     print("Bootstrap iterations:", n_iterations)
     print("Threshold range:", start_threshold, "to", end_threshold)
     print("Threshold step size:", step_size)
     print("Metrics saved to:", metrics_path)
     print("Summary saved to:", summary_path)
-    print("Best F1 metrics saved to:", best_f1_path)
+    print("Threshold summary saved to:", threshold_summary_path)
+    print("Threshold plot saved to:", threshold_plot_path)
     print("\nBootstrap summary:")
     print(summary_df)
-    print("\nBest F1 threshold metrics:")
-    print(best_f1_df)
 
 
 def main():
-    log_path = PROJECT_ROOT / "output" / str(CONFIG_NR) / f"bootstrap_{CONFIG_NR}.log"
+    config_nr = int(sys.argv[1]) if len(sys.argv) > 1 else CONFIG_NR
+    log_path = PROJECT_ROOT / "output" / str(config_nr) / f"bootstrap_{config_nr}.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     with log_path.open("w") as log_file:
@@ -96,7 +103,7 @@ def main():
         stderr = Tee(sys.stderr, log_file)
         with redirect_stdout(stdout), redirect_stderr(stderr):
             print("Log file:", log_path)
-            run_bootstrap_analysis()
+            run_bootstrap_analysis(config_nr=config_nr)
 
 
 if __name__ == "__main__":

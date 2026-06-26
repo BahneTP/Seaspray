@@ -179,7 +179,7 @@ def plot_bootstrap_metrics(
     
     Args:
         bootstrap_results_df: DataFrame with columns:
-            threshold, metric, mean, ci_lower, ci_upper
+            threshold, metric, mean, q025, q975
         output_path: Path to save the figure
     """
     plt.figure(figsize=(9, 5))
@@ -210,8 +210,8 @@ def plot_bootstrap_metrics(
         # Plot confidence interval as band
         plt.fill_between(
             metric_data["threshold"],
-            metric_data["ci_lower"],
-            metric_data["ci_upper"],
+            metric_data["q025"],
+            metric_data["q975"],
             color=colors[metric],
             alpha=0.15,  # Semi-transparent
         )
