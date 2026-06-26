@@ -45,9 +45,13 @@ class SVM():
     # Apply trained SVM to ALL data (including IBI)
 
         X_all = df[self.feature_cols]
+        margin_distance = np.abs(self.svm_model.decision_function(X_all))
+
+        if margin_distance.ndim > 1:
+            margin_distance = margin_distance.min(axis=1)
 
         df_all_results = df.copy()
         df_all_results["svm_pred"] = self.svm_model.predict(X_all)
-        df_all_results["svm_margin_distance"] = np.abs(self.svm_model.decision_function(X_all))
+        df_all_results["svm_margin_distance"] = margin_distance
 
         return df_all_results

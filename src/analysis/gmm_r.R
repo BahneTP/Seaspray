@@ -28,15 +28,14 @@ X_all_scaled <- scale(X_all, center = center, scale = scale_)
 
 gmm <- Mclust(
   X_train_scaled,
-  G = 2,
-  modelNames = "VVV",
+  G = 3,
   verbose = FALSE
 )
 
 if (is.null(gmm)) {
   gmm <- Mclust(
     X_train_scaled,
-    G = 2,
+    G = 3,
     verbose = FALSE
   )
 }
@@ -51,7 +50,7 @@ result <- data.frame(
   row_index = seq_len(nrow(all_df)) - 1,
   gmm_prob_0 = pred$z[, 1],
   gmm_prob_1 = pred$z[, 2],
-  gmm_prob_distance = abs(pred$z[, 1] - pred$z[, 2]),
+  gmm_prob_2 = pred$z[, 3],
   gmm_model = gmm$modelName
 )
 

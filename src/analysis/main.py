@@ -1,85 +1,120 @@
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
+import sys
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from svm import *
-from gmm import *
-from gmm_r import *
-from ibi_detection import *
-import grid_plot
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+from gmm_r import GMM_R
+from ibi_detection import detect_ibi, plot_ibi_threshold_metrics
+from svm import SVM
+
+
+class Tee():
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for stream in self.streams:
+            stream.write(data)
+            stream.flush()
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
+CONFIG_NR = 4
 
-# =========================
-# 1. Load Data.
-# =========================
-config_nr = 0
-DATASET_PATH = PROJECT_ROOT / "output" / "synthetic_datasets" / f"{config_nr}.csv"
-PLOT_DIR = PROJECT_ROOT / "output" / "plots"
-PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
-df = pd.read_csv(DATASET_PATH)
-feature_cols = ["δ13C coll", "δ15N coll", "δ13C carb", "δ18O carb"]
+def run_analysis():
+    # =========================
+    # 1. Load Data.
+    # =========================
+    output_dir = PROJECT_ROOT / "output" / str(CONFIG_NR)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    dataset_path = output_dir / f"{CONFIG_NR}.csv"
 
-# =========================
-# 2. Split Data.
-# =========================
-df_labeled = df[df["cluster"].isin(["herbivorous", "piscivorous"])].copy()
-df_train, df_test = train_test_split(
-    df_labeled,
-    test_size=0.2,
-    random_state=42,
-    stratify=df_labeled["cluster"]
-)
+    df = pd.read_csv(dataset_path)
+    feature_cols = ["δ13C coll", "δ15N coll", "δ13C carb", "δ18O carb"]
 
-# =========================
-# 3. Run SVM & GMM
-# =========================
-svm = SVM(df_train, df_test, feature_cols)
-svm.report()
-df = svm.save(df)
+    # =========================
+    # 2. Split Data.
+    # =========================
+    df_labeled = df[df["cluster"].isin(["herbivorous", "piscivorous", "ibi"])].copy()
+    df_train, df_test = train_test_split(
+        df_labeled,
+        test_size=0.2,
+        random_state=42,
+        stratify=df_labeled["cluster"]
+    )
 
-gmm = GMM_R(df_train, feature_cols)
-df = gmm.save(df)
+    # =========================
+    # 3. Run GMM & SVM
+    # =========================
+    gmm = GMM_R(df_train, feature_cols)
+    df = gmm.save(df)
 
-# =========================
-# 4. Ibi Detection
-# =========================
-IBI_DETECTION_MODE = "gmm"
-SVM_THRESHOLD = 1.0
-GMM_THRESHOLD = 0.2
-COMBINED_OPERATOR = "or"
+    # svm = SVM(df_train, df_test, feature_cols)
+    # svm.report()
+    # df = svm.save(df)
 
-df = detect_ibi(
-    df,
-    mode=IBI_DETECTION_MODE,
-    svm_threshold=SVM_THRESHOLD,
-    gmm_threshold=GMM_THRESHOLD,
-    combined_operator=COMBINED_OPERATOR
-)
-ibi_metrics = plot_ibi_threshold_metrics(
-    df,
-    mode=IBI_DETECTION_MODE,
-    start_threshold=0.1,
-    end_threshold=1.5,
-    step_size=0.1,
-    fixed_svm_threshold=SVM_THRESHOLD,
-    fixed_gmm_threshold=GMM_THRESHOLD,
-    combined_operator=COMBINED_OPERATOR,
-    output_path=PLOT_DIR / f"{config_nr}_{IBI_DETECTION_MODE}_ibi_threshold_metrics.png"
-)
+    # =========================
+    # 4. Ibi Detection
+    # =========================
+    ibi_detection_mode = "gmm"
+    svm_threshold = 1.0
+    gmm_threshold = 0.18    
+    combined_operator = "or"
 
-# =========================
-# 5. Grid-plot
-# ### WORK IN PROGRESS ###
-# =========================
-# grid_plot.run(df, output_path="gridplot.png")
+    df = detect_ibi(
+        df,
+        mode=ibi_detection_mode,
+        svm_threshold=svm_threshold,
+        gmm_threshold=gmm_threshold,
+        combined_operator=combined_operator
+    )
+    ibi_metrics = plot_ibi_threshold_metrics(
+        df,
+        mode=ibi_detection_mode,
+        start_threshold=0,
+        end_threshold=1,
+        step_size=0.01,
+        fixed_svm_threshold=svm_threshold,
+        fixed_gmm_threshold=gmm_threshold,
+        combined_operator=combined_operator,
+        output_path=output_dir / f"{CONFIG_NR}_{ibi_detection_mode}_ibi_threshold_metrics.png"
+    )
 
-# =========================
-# 6. Data Saving
-# =========================
-print(df[df["cluster"] == "ibi"])
-# df.to_csv(SCRIPT_DIR / "analysis.csv", index=False)
-# ibi_metrics.to_csv(SCRIPT_DIR / "ibi_threshold_metrics.csv", index=False)
+    # =========================
+    # 6. Grid-plot
+    # ### WORK IN PROGRESS ###
+    # =========================
+    # grid_plot.run(df, output_path=output_dir / "gridplot.png")
+
+    # =========================
+    # 7. Data Saving
+    # =========================
+    # print(df[df["cluster"] == "ibi"])
+    print(df)
+    # df.to_csv(output_dir / "analysis.csv", index=False)
+    # ibi_metrics.to_csv(output_dir / "ibi_threshold_metrics.csv", index=False)
+
+
+def main():
+    log_path = PROJECT_ROOT / "output" / str(CONFIG_NR) / f"analysis_{CONFIG_NR}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with log_path.open("w") as log_file:
+        stdout = Tee(sys.stdout, log_file)
+        stderr = Tee(sys.stderr, log_file)
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            print("Log file:", log_path)
+            run_analysis()
+
+
+if __name__ == "__main__":
+    main()

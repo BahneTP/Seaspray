@@ -13,7 +13,8 @@ def run(config):
     # -------------------------------------------
     # CONFIG
     # -------------------------------------------
-    synthetic_df = pd.read_csv(PROJECT_ROOT / "output" / "synthetic_datasets" / f"{c.NAME}.csv")
+    output_dir = PROJECT_ROOT / "output" / str(c.NAME)
+    synthetic_df = pd.read_csv(output_dir / f"{c.NAME}.csv")
 
     FEATURES = ["δ13C coll", "δ15N coll", "δ13C carb", "δ18O carb"]
 
@@ -207,7 +208,6 @@ def run(config):
         hspace=0.02
     )
 
-    output_dir = PROJECT_ROOT / "output" / "synthetic_datasets"
     output_dir.mkdir(parents=True, exist_ok=True)
     plt.savefig(
         output_dir / f"{c.NAME}_synthetic_plot_matrix.png",

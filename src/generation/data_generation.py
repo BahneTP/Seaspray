@@ -172,7 +172,7 @@ def run(config):
     synthetic_parts.append(ibi_df)
 
     synthetic_df = pd.concat(synthetic_parts, ignore_index=True)
-    output_dir = PROJECT_ROOT / "output" / "synthetic_datasets"
+    output_dir = PROJECT_ROOT / "output" / str(c.NAME)
     output_dir.mkdir(parents=True, exist_ok=True)
     synthetic_df.to_csv(output_dir / f"{c.NAME}.csv", index=False)
 

@@ -60,12 +60,14 @@ class GMM_R():
                     )
                 )
 
+            if result.stdout.strip():
+                print(result.stdout.strip())
+
             gmm_results = pd.read_csv(output_path)
 
         gmm_results = gmm_results.sort_values("row_index").reset_index(drop=True)
         df_results["gmm_prob_0"] = gmm_results["gmm_prob_0"].to_numpy()
         df_results["gmm_prob_1"] = gmm_results["gmm_prob_1"].to_numpy()
-        df_results["gmm_prob_distance"] = gmm_results["gmm_prob_distance"].to_numpy()
-        df_results["gmm_model"] = gmm_results["gmm_model"].to_numpy()
+        df_results["gmm_prob_2"] = gmm_results["gmm_prob_2"].to_numpy()
 
         return df_results
