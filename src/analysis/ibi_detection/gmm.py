@@ -79,13 +79,17 @@ def _get_ibi_prob(df, potential_ibi_cluster):
     return df[ibi_prob_col]
 
 
-def _prepare_gmm_metric(df):
-    df_clustered = add_gmm_cluster(df)
-    (
-        potential_ibi_cluster,
-        cluster_summary,
-        distances,
-    ) = find_potential_ibi_cluster(df_clustered)
+def _prepare_gmm_metric(df, potential_ibi_cluster=None):
+    cluster_summary = None
+    distances = None
+
+    if potential_ibi_cluster is None:
+        df_clustered = add_gmm_cluster(df)
+        (
+            potential_ibi_cluster,
+            cluster_summary,
+            distances,
+        ) = find_potential_ibi_cluster(df_clustered)
 
     df_results = df.copy()
     df_results["gmm_ibi_prob"] = _get_ibi_prob(
@@ -96,27 +100,45 @@ def _prepare_gmm_metric(df):
     return df_results, potential_ibi_cluster, cluster_summary, distances
 
 
-def add_gmm_ibi_prob(df):
-    df_results, _, _, _ = _prepare_gmm_metric(df)
+def add_gmm_ibi_prob(df, potential_ibi_cluster=None):
+    df_results, _, _, _ = _prepare_gmm_metric(
+        df,
+        potential_ibi_cluster=potential_ibi_cluster,
+    )
     return df_results
 
 
-def get_gmm_mask(df, threshold):
-    df_results = add_gmm_ibi_prob(df)
+def get_gmm_mask(df, threshold, potential_ibi_cluster=None):
+    df_results = add_gmm_ibi_prob(
+        df,
+        potential_ibi_cluster=potential_ibi_cluster,
+    )
     return df_results["gmm_ibi_prob"] >= threshold
 
 
-def detect_gmm(df, threshold=0.2, printing=True):
+def detect_gmm(
+    df,
+    threshold=0.2,
+    printing=True,
+    potential_ibi_cluster=None,
+    upper_marine_limit_detection=False,
+    feature_cols=None,
+    upper_marine_limits=None,
+):
     df_results, potential_ibi_cluster, cluster_summary, distances = _prepare_gmm_metric(
-        df
+        df,
+        potential_ibi_cluster=potential_ibi_cluster,
     )
 
-    if printing:
+    if printing and cluster_summary is not None:
         print_gmm_cluster_report(potential_ibi_cluster, cluster_summary, distances)
 
     df_results = add_ibi_prediction(
         df_results,
         df_results["gmm_ibi_prob"] >= threshold,
+        upper_marine_limit_detection=upper_marine_limit_detection,
+        feature_cols=feature_cols,
+        upper_marine_limits=upper_marine_limits,
     )
     metrics = calculate_ibi_metrics(df_results)
 

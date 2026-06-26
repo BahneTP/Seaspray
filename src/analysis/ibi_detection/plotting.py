@@ -18,12 +18,29 @@ def _detect_ibi_for_plot(
     svm_threshold,
     gmm_threshold,
     combined_operator,
+    upper_marine_limit_detection=False,
+    feature_cols=None,
+    upper_marine_limits=None,
 ):
     if mode == "svm":
-        return detect_svm(df, threshold=svm_threshold, printing=False)
+        return detect_svm(
+            df,
+            threshold=svm_threshold,
+            printing=False,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
+        )
 
     if mode == "gmm":
-        return detect_gmm(df, threshold=gmm_threshold, printing=False)
+        return detect_gmm(
+            df,
+            threshold=gmm_threshold,
+            printing=False,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
+        )
 
     if mode == "combined":
         return detect_combined(
@@ -32,6 +49,9 @@ def _detect_ibi_for_plot(
             gmm_threshold=gmm_threshold,
             operator=combined_operator,
             printing=False,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
         )
 
     raise ValueError("mode must be one of: 'svm', 'gmm', 'combined'")
@@ -48,6 +68,9 @@ def plot_ibi_threshold_metrics(
     fixed_gmm_threshold=0.2,
     combined_operator="or",
     sweep_threshold="auto",
+    upper_marine_limit_detection=False,
+    feature_cols=None,
+    upper_marine_limits=None,
 ):
     rows = []
     thresholds = np.arange(start_threshold, end_threshold + step_size / 2, step_size)
@@ -77,6 +100,9 @@ def plot_ibi_threshold_metrics(
             svm_threshold=svm_threshold,
             gmm_threshold=gmm_threshold,
             combined_operator=combined_operator,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
         )
         metrics = calculate_ibi_metrics(df_threshold)
         metrics["threshold"] = threshold

@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 
 from gmm_r import GMM_R
 from ibi_detection import detect_ibi, plot_ibi_threshold_metrics
+from ibi_detection.common import calculate_upper_marine_limits
 from svm import SVM
 
 
@@ -69,13 +70,18 @@ def run_analysis():
     svm_threshold = 1.0
     gmm_threshold = 0.18    
     combined_operator = "or"
+    upper_marine_limit_detection = True
+    upper_marine_limits = calculate_upper_marine_limits(df_train, feature_cols)
 
     df = detect_ibi(
         df,
         mode=ibi_detection_mode,
         svm_threshold=svm_threshold,
         gmm_threshold=gmm_threshold,
-        combined_operator=combined_operator
+        combined_operator=combined_operator,
+        upper_marine_limit_detection=upper_marine_limit_detection,
+        feature_cols=feature_cols,
+        upper_marine_limits=upper_marine_limits,
     )
     ibi_metrics = plot_ibi_threshold_metrics(
         df,
@@ -86,6 +92,9 @@ def run_analysis():
         fixed_svm_threshold=svm_threshold,
         fixed_gmm_threshold=gmm_threshold,
         combined_operator=combined_operator,
+        upper_marine_limit_detection=upper_marine_limit_detection,
+        feature_cols=feature_cols,
+        upper_marine_limits=upper_marine_limits,
         output_path=output_dir / f"{CONFIG_NR}_{ibi_detection_mode}_ibi_threshold_metrics.png"
     )
 

@@ -11,6 +11,10 @@ def detect_ibi(
     gmm_threshold=0.2,
     combined_operator="or",
     printing=True,
+    potential_ibi_cluster=None,
+    upper_marine_limit_detection=False,
+    feature_cols=None,
+    upper_marine_limits=None,
 ):
     mode = mode.lower()
 
@@ -19,6 +23,9 @@ def detect_ibi(
             df,
             threshold=svm_threshold,
             printing=printing,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
         )
 
     if mode == "gmm":
@@ -26,6 +33,10 @@ def detect_ibi(
             df,
             threshold=gmm_threshold,
             printing=printing,
+            potential_ibi_cluster=potential_ibi_cluster,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
         )
 
     if mode == "combined":
@@ -35,6 +46,10 @@ def detect_ibi(
             gmm_threshold=gmm_threshold,
             operator=combined_operator,
             printing=printing,
+            potential_ibi_cluster=potential_ibi_cluster,
+            upper_marine_limit_detection=upper_marine_limit_detection,
+            feature_cols=feature_cols,
+            upper_marine_limits=upper_marine_limits,
         )
 
     raise ValueError("mode must be one of: 'svm', 'gmm', 'combined'")
